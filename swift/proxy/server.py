@@ -131,7 +131,7 @@ class Application(object):
         
         self.torrents_request_suffix = '?torrent'
         self.tracker_port = 6969;
-        self.dfile = 'dstate';
+        self.dfile = dstate;
         # BitTorrent.bittorrent-tracker --port self.tracker_port --dfile self.dfile
         
         #Ethan's code end
