@@ -125,7 +125,18 @@ class Application(object):
         else:
             raise ValueError(
                 'Invalid request_node_count value: %r' % ''.join(value))
-
+				
+				
+		# Ethan's code
+        
+        self.torrents_request_suffix = '?torrent'
+        self.tracker_port = 6969;
+        self.dfile = dstate;
+        # BitTorrent.bittorrent-tracker --port self.tracker_port --dfile self.dfile
+        
+        #Ethan's code end
+				
+				
     def get_controller(self, path):
         """
         Get the controller to handle a request.
@@ -201,6 +212,13 @@ class Application(object):
                     request=req, body='Invalid UTF8 or contains NULL')
 
             try:
+				# Ethan's code in here
+                isTorrentRequest = req.path.endswith(self.torrents_request_suffix);
+                if isTorrentRequest:
+                    req.environ['REQUEST_METHOD'] = 'GET'
+                req.path = req.path[:-len(self.torrents_request_suffix)]
+                #Ethan's code end
+				
                 controller, path_parts = self.get_controller(req.path)
                 p = req.path_info
                 if isinstance(p, unicode):
