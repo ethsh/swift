@@ -203,7 +203,7 @@ class Application(object):
                     request=req, body='Invalid UTF8 or contains NULL')
 
             try:
-				print req.path
+			    print req.path
                 controller, path_parts = self.get_controller(req.path)
                 p = req.path_info
                 if isinstance(p, unicode):
