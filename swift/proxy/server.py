@@ -43,7 +43,7 @@ from swift.common.swob import HTTPBadRequest, HTTPForbidden, \
     HTTPServerError, Request
 
 # Ethan's Code
-import BitTorrent.BitTorrent.track import track
+from swift.BitTorrent.BitTorrent.track import track
 # Ethan's Code End
 
 
