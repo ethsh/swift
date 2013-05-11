@@ -42,6 +42,10 @@ from swift.common.swob import HTTPBadRequest, HTTPForbidden, \
     HTTPMethodNotAllowed, HTTPNotFound, HTTPPreconditionFailed, \
     HTTPServerError, Request
 
+# Ethan's Code
+import BitTorrent
+# Ethan's Code End
+
 
 class Application(object):
     """WSGI application for the proxy server."""
@@ -125,6 +129,13 @@ class Application(object):
         else:
             raise ValueError(
                 'Invalid request_node_count value: %r' % ''.join(value))
+
+        # Ethan's Code
+        self.torrent_request_suffix = '?torrent'
+        self.tracker_port = 6969
+        self.dfile = 'dstate'
+        ./bittorrent-tracker.py --port self.tracker_port --dfile self.dfile
+        # Ethan's Code End
 				
 				
 				
@@ -186,6 +197,7 @@ class Application(object):
         :param req: swob.Request object
         """
         try:
+            
             self.logger.set_statsd_prefix('proxy-server')
             if req.content_length and req.content_length < 0:
                 self.logger.increment('errors')
@@ -203,6 +215,8 @@ class Application(object):
                     request=req, body='Invalid UTF8 or contains NULL')
 
             try:
+                if req.path.endswith(self.torrent_request_suffix):
+                    req.path = req.path[:-len(self.torrent_request_suffix)]
                 controller, path_parts = self.get_controller(req.path)
                 p = req.path_info
                 if isinstance(p, unicode):
