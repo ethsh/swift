@@ -43,7 +43,7 @@ from swift.common.swob import HTTPBadRequest, HTTPForbidden, \
     HTTPServerError, Request
 
 # Ethan's Code
-import BitTorrent
+import BitTorrent.BitTorrent.track import track
 # Ethan's Code End
 
 
@@ -134,7 +134,8 @@ class Application(object):
         self.torrent_request_suffix = '?torrent'
         self.tracker_port = 6969
         self.dfile = 'dstate'
-        ./bittorrent-tracker.py --port self.tracker_port --dfile self.dfile
+        track(self.tracker_port, self.dfile)
+        # ./bittorrent-tracker.py --port self.tracker_port --dfile self.dfile
         # Ethan's Code End
 				
 				
