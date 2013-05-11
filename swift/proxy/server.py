@@ -43,7 +43,7 @@ from swift.common.swob import HTTPBadRequest, HTTPForbidden, \
     HTTPServerError, Request
 
 # Ethan's Code
-from swift.BitTorrent.BitTorrent.track import track
+# from swift.BitTorrent.BitTorrent.track import track
 # Ethan's Code End
 
 
@@ -134,7 +134,7 @@ class Application(object):
         self.torrent_request_suffix = '?torrent'
         self.tracker_port = 6969
         self.dfile = 'dstate'
-        track(self.tracker_port, self.dfile)
+        # track(self.tracker_port, self.dfile)
         # ./bittorrent-tracker.py --port self.tracker_port --dfile self.dfile
         # Ethan's Code End
 				
@@ -216,8 +216,10 @@ class Application(object):
                     request=req, body='Invalid UTF8 or contains NULL')
 
             try:
+                # Ethan's Code
                 if req.path.endswith(self.torrent_request_suffix):
                     req.path = req.path[:-len(self.torrent_request_suffix)]
+                # Ethan's Code End
                 controller, path_parts = self.get_controller(req.path)
                 p = req.path_info
                 if isinstance(p, unicode):
