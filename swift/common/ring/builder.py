@@ -27,8 +27,6 @@ from swift.common import exceptions
 from swift.common.ring import RingData
 from swift.common.ring.utils import tiers_for_dev, build_tier_tree
 
-MAX_BALANCE = 999.99
-
 
 class RingBuilder(object):
     """
@@ -416,9 +414,9 @@ class RingBuilder(object):
                     if dev_usage[dev['id']]:
                         # If a device has no weight, but has partitions, then
                         # its overage is considered "infinity" and therefore
-                        # always the worst possible. We show MAX_BALANCE for
+                        # always the worst possible. We show 999.99 for
                         # convenience.
-                        worst = MAX_BALANCE
+                        worst = 999.99
                         break
                     continue
                 skew = abs(100.0 * dev_usage[dev['id']] /
@@ -446,8 +444,8 @@ class RingBuilder(object):
                 if dev['parts']:
                     # If a device has no weight, but has partitions, then its
                     # overage is considered "infinity" and therefore always the
-                    # worst possible. We show MAX_BALANCE for convenience.
-                    balance = MAX_BALANCE
+                    # worst possible. We show 999.99 for convenience.
+                    balance = 999.99
                     break
                 continue
             dev_balance = abs(100.0 * dev['parts'] /

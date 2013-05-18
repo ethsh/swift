@@ -180,10 +180,7 @@ def direct_get_container(node, part, account, container, marker=None,
 
 
 def direct_delete_container(node, part, account, container, conn_timeout=5,
-                            response_timeout=15, headers=None):
-    if headers is None:
-        headers = {}
-
+                            response_timeout=15, headers={}):
     path = '/%s/%s' % (account, container)
     headers['X-Timestamp'] = normalize_timestamp(time())
     with Timeout(conn_timeout):
@@ -240,7 +237,7 @@ def direct_head_object(node, part, account, container, obj, conn_timeout=5,
 
 
 def direct_get_object(node, part, account, container, obj, conn_timeout=5,
-                      response_timeout=15, resp_chunk_size=None, headers=None):
+                      response_timeout=15, resp_chunk_size=None, headers={}):
     """
     Get object directly from the object server.
 
@@ -256,9 +253,6 @@ def direct_get_object(node, part, account, container, obj, conn_timeout=5,
     :returns: a tuple of (response headers, the object's contents) The response
               headers will be a dict and all header names will be lowercase.
     """
-    if headers is None:
-        headers = {}
-
     path = '/%s/%s/%s' % (account, container, obj)
     with Timeout(conn_timeout):
         conn = http_connect(node['ip'], node['port'], node['device'], part,
@@ -384,7 +378,7 @@ def direct_post_object(node, part, account, container, name, headers,
 
 
 def direct_delete_object(node, part, account, container, obj,
-                         conn_timeout=5, response_timeout=15, headers=None):
+                         conn_timeout=5, response_timeout=15, headers={}):
     """
     Delete object directly from the object server.
 
@@ -397,9 +391,6 @@ def direct_delete_object(node, part, account, container, obj,
     :param response_timeout: timeout in seconds for getting the response
     :returns: response from server
     """
-    if headers is None:
-        headers = {}
-
     path = '/%s/%s/%s' % (account, container, obj)
     headers['X-Timestamp'] = normalize_timestamp(time())
     with Timeout(conn_timeout):

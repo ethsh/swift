@@ -26,7 +26,7 @@ from StringIO import StringIO
 import eventlet
 import eventlet.debug
 from eventlet import greenio, GreenPool, sleep, wsgi, listen
-from paste.deploy import loadwsgi
+from paste.deploy import loadapp, appconfig
 from eventlet.green import socket, ssl
 from urllib import unquote
 
@@ -35,74 +35,6 @@ from swift.common.swob import Request
 from swift.common.utils import capture_stdio, disable_fallocate, \
     drop_privileges, get_logger, NullLogger, config_true_value, \
     validate_configuration, get_hub
-
-
-class NamedConfigLoader(loadwsgi.ConfigLoader):
-    """
-    Patch paste.deploy's ConfigLoader so each context object will know what
-    config section it came from.
-    """
-
-    def get_context(self, object_type, name=None, global_conf=None):
-        context = super(NamedConfigLoader, self).get_context(
-            object_type, name=name, global_conf=global_conf)
-        context.name = name
-        return context
-
-
-loadwsgi.ConfigLoader = NamedConfigLoader
-
-
-class ConfigDirLoader(NamedConfigLoader):
-    """
-    Read configuration from multiple files under the given path.
-    """
-
-    def __init__(self, conf_dir):
-        # parent class uses filename attribute when building error messages
-        self.filename = conf_dir = conf_dir.strip()
-        defaults = {
-            'here': os.path.normpath(os.path.abspath(conf_dir)),
-            '__file__': os.path.abspath(conf_dir)
-        }
-        self.parser = loadwsgi.NicerConfigParser(conf_dir, defaults=defaults)
-        self.parser.optionxform = str  # Don't lower-case keys
-        utils.read_conf_dir(self.parser, conf_dir)
-
-
-def _loadconfigdir(object_type, uri, path, name, relative_to, global_conf):
-    if relative_to:
-        path = os.path.normpath(os.path.join(relative_to, path))
-    loader = ConfigDirLoader(path)
-    if global_conf:
-        loader.update_defaults(global_conf, overwrite=False)
-    return loader.get_context(object_type, name, global_conf)
-
-
-# add config_dir parsing to paste.deploy
-loadwsgi._loaders['config_dir'] = _loadconfigdir
-
-
-def wrap_conf_type(f):
-    """
-    Wrap a function whos first argument is a paste.deploy style config uri,
-    such that you can pass it an un-adorned raw filesystem path and the config
-    directive (either config: or config_dir:) will be added automatically
-    based on the type of filesystem entity at the given path (either a file or
-    directory) before passing it through to the paste.deploy function.
-    """
-    def wrapper(conf_path, *args, **kwargs):
-        if os.path.isdir(conf_path):
-            conf_type = 'config_dir'
-        else:
-            conf_type = 'config'
-        conf_uri = '%s:%s' % (conf_type, conf_path)
-        return f(conf_uri, *args, **kwargs)
-    return wrapper
-
-
-appconfig = wrap_conf_type(loadwsgi.appconfig)
-loadapp = wrap_conf_type(loadwsgi.loadapp)
 
 
 def monkey_patch_mimetools():
@@ -173,63 +105,18 @@ def get_socket(conf, default_port=8080):
     return sock
 
 
-class RestrictedGreenPool(GreenPool):
-    """
-    Works the same as GreenPool, but if the size is specified as one, then the
-    spawn_n() method will invoke waitall() before returning to prevent the
-    caller from doing any other work (like calling accept()).
-    """
-    def __init__(self, size=1024):
-        super(RestrictedGreenPool, self).__init__(size=size)
-        self._rgp_do_wait = (size == 1)
-
-    def spawn_n(self, *args, **kwargs):
-        super(RestrictedGreenPool, self).spawn_n(*args, **kwargs)
-        if self._rgp_do_wait:
-            self.waitall()
-
-
-def run_server(conf, logger, sock):
-    wsgi.HttpProtocol.default_request_version = "HTTP/1.0"
-    # Turn off logging requests by the underlying WSGI software.
-    wsgi.HttpProtocol.log_request = lambda *a: None
-    # Redirect logging other messages by the underlying WSGI software.
-    wsgi.HttpProtocol.log_message = \
-        lambda s, f, *a: logger.error('ERROR WSGI: ' + f % a)
-    wsgi.WRITE_TIMEOUT = int(conf.get('client_timeout') or 60)
-
-    eventlet.hubs.use_hub(get_hub())
-    eventlet.patcher.monkey_patch(all=False, socket=True)
-    eventlet_debug = config_true_value(conf.get('eventlet_debug', 'no'))
-    eventlet.debug.hub_exceptions(eventlet_debug)
-    # utils.LogAdapter stashes name in server; fallback on unadapted loggers
-    if hasattr(logger, 'server'):
-        log_name = logger.server
-    else:
-        log_name = logger.name
-    app = loadapp(conf['__file__'], global_conf={'log_name': log_name})
-    max_clients = int(conf.get('max_clients', '1024'))
-    pool = RestrictedGreenPool(size=max_clients)
-    try:
-        wsgi.server(sock, app, NullLogger(), custom_pool=pool)
-    except socket.error, err:
-        if err[0] != errno.EINVAL:
-            raise
-    pool.waitall()
-
-
-# TODO: pull more pieces of this to test more
-def run_wsgi(conf_path, app_section, *args, **kwargs):
+# TODO: pull pieces of this out to test
+def run_wsgi(conf_file, app_section, *args, **kwargs):
     """
     Runs the server using the specified number of workers.
 
-    :param conf_path: Path to paste.deploy style configuration file/directory
+    :param conf_file: Path to paste.deploy style configuration file
     :param app_section: App name from conf file to load config from
     """
     # Load configuration, Set logger and Load request processor
     try:
         (app, conf, logger, log_name) = \
-            init_request_processor(conf_path, app_section, *args, **kwargs)
+            init_request_processor(conf_file, app_section, *args, **kwargs)
     except ConfigFileError, e:
         print e
         return
@@ -245,10 +132,33 @@ def run_wsgi(conf_path, app_section, *args, **kwargs):
     # redirect errors to logger and close stdio
     capture_stdio(logger)
 
+    def run_server():
+        wsgi.HttpProtocol.default_request_version = "HTTP/1.0"
+        # Turn off logging requests by the underlying WSGI software.
+        wsgi.HttpProtocol.log_request = lambda *a: None
+        # Redirect logging other messages by the underlying WSGI software.
+        wsgi.HttpProtocol.log_message = \
+            lambda s, f, *a: logger.error('ERROR WSGI: ' + f % a)
+        wsgi.WRITE_TIMEOUT = int(conf.get('client_timeout') or 60)
+
+        eventlet.hubs.use_hub(get_hub())
+        eventlet.patcher.monkey_patch(all=False, socket=True)
+        eventlet_debug = config_true_value(conf.get('eventlet_debug', 'no'))
+        eventlet.debug.hub_exceptions(eventlet_debug)
+        app = loadapp('config:%s' % conf_file,
+                      global_conf={'log_name': log_name})
+        pool = GreenPool(size=1024)
+        try:
+            wsgi.server(sock, app, NullLogger(), custom_pool=pool)
+        except socket.error, err:
+            if err[0] != errno.EINVAL:
+                raise
+        pool.waitall()
+
     worker_count = int(conf.get('workers', '1'))
     # Useful for profiling [no forks].
     if worker_count == 0:
-        run_server(conf, logger, sock)
+        run_server()
         return
 
     def kill_children(*args):
@@ -274,7 +184,7 @@ def run_wsgi(conf_path, app_section, *args, **kwargs):
             if pid == 0:
                 signal.signal(signal.SIGHUP, signal.SIG_DFL)
                 signal.signal(signal.SIGTERM, signal.SIG_DFL)
-                run_server(conf, logger, sock)
+                run_server()
                 logger.notice('Child %d exiting normally' % os.getpid())
                 return
             else:
@@ -300,22 +210,22 @@ class ConfigFileError(Exception):
     pass
 
 
-def init_request_processor(conf_path, app_section, *args, **kwargs):
+def init_request_processor(conf_file, app_section, *args, **kwargs):
     """
     Loads common settings from conf
     Sets the logger
     Loads the request processor
 
-    :param conf_path: Path to paste.deploy style configuration file/directory
+    :param conf_file: Path to paste.deploy style configuration file
     :param app_section: App name from conf file to load config from
     :returns: the loaded application entry point
     :raises ConfigFileError: Exception is raised for config file error
     """
     try:
-        conf = appconfig(conf_path, name=app_section)
+        conf = appconfig('config:%s' % conf_file, name=app_section)
     except Exception, e:
-        raise ConfigFileError("Error trying to load config from %s: %s" %
-                              (conf_path, e))
+        raise ConfigFileError("Error trying to load config %s: %s" %
+                              (conf_file, e))
 
     validate_configuration()
 
@@ -333,7 +243,7 @@ def init_request_processor(conf_path, app_section, *args, **kwargs):
         disable_fallocate()
 
     monkey_patch_mimetools()
-    app = loadapp(conf_path, global_conf={'log_name': log_name})
+    app = loadapp('config:%s' % conf_file, global_conf={'log_name': log_name})
     return (app, conf, logger, log_name)
 
 

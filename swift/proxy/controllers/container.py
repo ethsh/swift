@@ -50,12 +50,6 @@ class ContainerController(Controller):
         self.account_name = unquote(account_name)
         self.container_name = unquote(container_name)
 
-    def _x_remove_headers(self):
-        st = self.server_type.lower()
-        return ['x-remove-%s-read' % st,
-                'x-remove-%s-write' % st,
-                'x-remove-versions-location']
-
     def clean_acls(self, req):
         if 'swift.clean_acl' in req.environ:
             for header in ('x-container-read', 'x-container-write'):
@@ -72,10 +66,11 @@ class ContainerController(Controller):
         """Handler for HTTP GET/HEAD requests."""
         if not self.account_info(self.account_name)[1]:
             return HTTPNotFound(request=req)
-        part = self.app.container_ring.get_part(
+        part, nodes = self.app.container_ring.get_nodes(
             self.account_name, self.container_name)
+        nodes = self.app.sort_nodes(nodes)
         resp = self.GETorHEAD_base(
-            req, _('Container'), self.app.container_ring, part, req.path_info)
+            req, _('Container'), part, nodes, req.path_info, len(nodes))
         if self.app.memcache:
             # set the memcache container size for ratelimiting
             cache_key = get_container_memcache_key(self.account_name,

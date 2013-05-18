@@ -1,4 +1,4 @@
-# Swift - Ethan's awesome torrent fork.
+# Swift
 
 A distributed object storage system designed to scale from a single machine
 to thousands of servers. Swift is optimized for multi-tenancy and high

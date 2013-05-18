@@ -57,7 +57,7 @@ Web Front End Options
 ---------------------
 
 Swift comes with an integral web front end. However, it can also be deployed
-as a request processor of an Apache2 using mod_wsgi as described in
+as a request processor of an Apache2 using mod_wsgi as described in 
 :doc:`Apache Deployment Guide <apache_deployment_guide>`.
 
 .. _ring-preparing:
@@ -139,102 +139,15 @@ swift-ring-builder with no options will display help text with available
 commands and options. More information on how the ring works internally
 can be found in the :doc:`Ring Overview <overview_ring>`.
 
-.. _general-service-configuration:
-
------------------------------
-General Service Configuration
------------------------------
-
-Most Swift services fall into two categories.  Swift's wsgi servers and
-background daemons.  
-
-For more information specific to the configuration of Swift's wsgi servers
-with paste deploy see :ref:`general-server-configuration`
-
-Configuration for servers and daemons can be expressed together in the same
-file for each type of server, or separately.  If a required section for the
-service trying to start is missing there will be an error.  The sections not
-used by the service are ignored.
-
-Consider the example of an object storage node.  By convention configuration
-for the object-server, object-updater, object-replicator, and object-auditor
-exist in a single file ``/etc/swift/object-server.conf``::
-
-    [DEFAULT]
-
-    [pipeline:main]
-    pipeline = object-server
-
-    [app:object-server]
-    use = egg:swift#object
-
-    [object-replicator]
-    reclaim_age = 259200
-
-    [object-updater]
-
-    [object-auditor]
-
-Swift services expect a configuration path as the first argument::
-
-    $ swift-object-auditor 
-    Usage: swift-object-auditor CONFIG [options]
-
-    Error: missing config path argument
-
-If you omit the object-auditor section this file could not be used as the
-configuration path when starting the ``swift-object-auditor`` daemon::
-
-    $ swift-object-auditor /etc/swift/object-server.conf 
-    Unable to find object-auditor config section in /etc/swift/object-server.conf
-
-If the configuration path is a directory instead of a file all of the files in
-the directory with the file extension ".conf" will be combined to generate the
-configuration object which is delivered to the Swift service.  This is
-referred to generally as "directory based configuration".
-
-Directory based configuration leverages ConfigParser's native multi-file
-support.  Files ending in ".conf" in the given directory are parsed in
-lexicographical order.  Filenames starting with '.' are ignored.  A mixture of
-file and directory configuration paths is not supported - if the configuration
-path is a file only that file will be parsed.
-
-The swift service management tool ``swift-init`` has adopted the convention of
-looking for ``/etc/swift/{type}-server.conf.d/`` if the file
-``/etc/swift/{type}-server.conf`` file does not exist.
-
-When using directory based configuration, if the same option under the same
-section appears more than once in different files, the last value parsed is
-said to override previous occurrences.  You can ensure proper override
-precedence by prefixing the files in the configuration directory with
-numerical values.::
-
-    /etc/swift/
-        default.base
-        object-server.conf.d/
-            000_default.conf -> ../default.base
-            001_default-override.conf
-            010_server.conf
-            020_replicator.conf
-            030_updater.conf
-            040_auditor.conf
-
-You can inspect the resulting combined configuration object using the
-``swift-config`` command line tool
-
-.. _general-server-configuration:
-
 ----------------------------
 General Server Configuration
 ----------------------------
 
 Swift uses paste.deploy (http://pythonpaste.org/deploy/) to manage server
-configurations.
-
-Default configuration options are set in the `[DEFAULT]` section, and any
-options specified there can be overridden in any of the other sections BUT
-ONLY BY USING THE SYNTAX ``set option_name = value``. This is the unfortunate
-way paste.deploy works and I'll try to explain it in full.
+configurations. Default configuration options are set in the `[DEFAULT]`
+section, and any options specified there can be overridden in any of the other
+sections BUT ONLY BY USING THE SYNTAX ``set option_name = value``. This is the
+unfortunate way paste.deploy works and I'll try to explain it in full.
 
 First, here's an example paste.deploy configuration file::
 
@@ -305,7 +218,6 @@ The main rule to remember when working with Swift configuration files is:
     configuration files.
 
 
-
 ---------------------------
 Object Server Configuration
 ---------------------------
@@ -329,16 +241,6 @@ bind_ip              0.0.0.0     IP Address for server to bind to
 bind_port            6000        Port for server to bind to
 bind_timeout         30          Seconds to attempt bind before giving up
 workers              1           Number of workers to fork
-max_clients          1024        Maximum number of clients one worker can
-                                 process simultaneously (it will actually
-                                 accept(2) N + 1). Setting this to one (1)
-                                 will only handle one request at a time,
-                                 without accepting another request
-                                 concurrently. By increasing the number of
-                                 workers to a much higher value, one can
-                                 reduce the impact of slow file system
-                                 operations in one request from negatively
-                                 impacting other requests.
 disable_fallocate    false       Disable "fast fail" fallocate checks if the
                                  underlying filesystem does not support it.
 log_custom_handlers  None        Comma-separated list of functions to call
@@ -456,16 +358,6 @@ bind_ip              0.0.0.0     IP Address for server to bind to
 bind_port            6001        Port for server to bind to
 bind_timeout         30          Seconds to attempt bind before giving up
 workers              1           Number of workers to fork
-max_clients          1024        Maximum number of clients one worker can
-                                 process simultaneously (it will actually
-                                 accept(2) N + 1). Setting this to one (1)
-                                 will only handle one request at a time,
-                                 without accepting another request
-                                 concurrently. By increasing the number of
-                                 workers to a much higher value, one can
-                                 reduce the impact of slow file system
-                                 operations in one request from negatively
-                                 impacting other requests.
 user                 swift       User to run as
 disable_fallocate    false       Disable "fast fail" fallocate checks if the
                                  underlying filesystem does not support it.
@@ -548,7 +440,7 @@ log_name               container-auditor  Label used when logging
 log_facility           LOG_LOCAL0         Syslog log facility
 log_level              INFO               Logging level
 interval               1800               Minimum time for a pass to take
-containers_per_second  200                Maximum containers audited per second.
+containers_per_second  200                Maximum containers audited per second. 
                                           Should be tuned according to individual
                                           system specs. 0 is unlimited.
 =====================  =================  =======================================
@@ -576,16 +468,6 @@ bind_ip              0.0.0.0     IP Address for server to bind to
 bind_port            6002        Port for server to bind to
 bind_timeout         30          Seconds to attempt bind before giving up
 workers              1           Number of workers to fork
-max_clients          1024        Maximum number of clients one worker can
-                                 process simultaneously (it will actually
-                                 accept(2) N + 1). Setting this to one (1)
-                                 will only handle one request at a time,
-                                 without accepting another request
-                                 concurrently. By increasing the number of
-                                 workers to a much higher value, one can
-                                 reduce the impact of slow file system
-                                 operations in one request from negatively
-                                 impacting other requests.
 user                 swift       User to run as
 db_preallocation     off         If you don't mind the extra disk space usage in
                                  overhead, you can turn this on to preallocate
@@ -645,9 +527,9 @@ log_name              account-auditor  Label used when logging
 log_facility          LOG_LOCAL0       Syslog log facility
 log_level             INFO             Logging level
 interval              1800             Minimum time for a pass to take
-accounts_per_second   200              Maximum accounts audited per second.
+accounts_per_second   200              Maximum accounts audited per second. 
                                        Should be tuned according to individual
-                                       system specs. 0 is unlimited.
+                                       system specs. 0 is unlimited. 
 ====================  ===============  =======================================
 
 [account-reaper]
@@ -690,21 +572,6 @@ bind_timeout                  30               Seconds to attempt bind before
                                                giving up
 swift_dir                     /etc/swift       Swift configuration directory
 workers                       1                Number of workers to fork
-max_clients                   1024             Maximum number of clients one
-                                               worker can process
-                                               simultaneously (it will
-                                               actually accept(2) N +
-                                               1). Setting this to one (1)
-                                               will only handle one request at
-                                               a time, without accepting
-                                               another request
-                                               concurrently. By increasing the
-                                               number of workers to a much
-                                               higher value, one can reduce
-                                               the impact of slow file system
-                                               operations in one request from
-                                               negatively impacting other
-                                               requests.
 user                          swift            User to run as
 cert_file                                      Path to the ssl .crt. This
                                                should be enabled for testing
@@ -713,9 +580,9 @@ key_file                                       Path to the ssl .key. This
                                                should be enabled for testing
                                                purposes only.
 cors_allow_origin                              This is a list of hosts that
-                                               are included with any CORS
-                                               request by default and
-                                               returned with the
+                                               are included with any CORS 
+                                               request by default and 
+                                               returned with the 
                                                Access-Control-Allow-Origin
                                                header in addition to what
                                                the container has set.
@@ -802,13 +669,6 @@ rate_limit_after_segment      10               Rate limit the download of
                                                this segment is downloaded.
 rate_limit_segments_per_sec   1                Rate limit large object
                                                downloads at this rate.
-request_node_count            2 * replicas     Set to the number of nodes to
-                                               contact for a normal request.
-                                               You can use '* replicas' at the
-                                               end to have it use the number
-                                               given times the number of
-                                               replicas for the ring being used
-                                               for the request.
 ============================  ===============  =============================
 
 [tempauth]
@@ -918,12 +778,12 @@ should also be monitored to ensure that the times do not vary too much.
 General Service Tuning
 ----------------------
 
-Most services support either a `worker` or `concurrency` value in the
-settings.  This allows the services to make effective use of the cores
-available. A good starting point to set the concurrency level for the proxy
-and storage services to 2 times the number of cores available. If more than
-one service is sharing a server, then some experimentation may be needed to
-find the best balance.
+Most services support either a worker or concurrency value in the settings.
+This allows the services to make effective use of the cores available. A good
+starting point to set the concurrency level for the proxy and storage services
+to 2 times the number of cores available. If more than one service is
+sharing a server, then some experimentation may be needed to find the best
+balance.
 
 At Rackspace, our Proxy servers have dual quad core processors, giving us 8
 cores. Our testing has shown 16 workers to be a pretty good balance when
@@ -931,21 +791,9 @@ saturating a 10g network and gives good CPU utilization.
 
 Our Storage servers all run together on the same servers. These servers have
 dual quad core processors, for 8 cores total. We run the Account, Container,
-and Object servers with 8 workers each. Most of the background jobs are run at
-a concurrency of 1, with the exception of the replicators which are run at a
-concurrency of 2.
-
-The `max_clients` parameter can be used to adjust the number of client
-requests an individual worker accepts for processing. The fewer requests being
-processed at one time, the less likely a request that consumes the worker's
-CPU time, or blocks in the OS, will negatively impact other requests. The more
-requests being processed at one time, the more likely one worker can utilize
-network and disk capacity.
-
-On systems that have more cores, and more memory, where one can afford to run
-more workers, raising the number of workers and lowering the maximum number of
-clients serviced per worker can lessen the impact of CPU intensive or stalled
-requests.
+and Object servers with 8 workers each. Most of the background jobs are run
+at a concurrency of 1, with the exception of the replicators which are run at
+a concurrency of 2.
 
 The above configuration setting should be taken as suggestions and testing
 of configuration settings should be done to ensure best utilization of CPU,
