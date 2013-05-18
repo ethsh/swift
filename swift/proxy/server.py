@@ -49,7 +49,7 @@ from swift.common.swob import HTTPBadRequest, HTTPForbidden, \
 #Note: BitTorrent hijacks our stderr, reclaim it
 from BitTorrent import reset_stderr
 reset_stderr()
-import BitTorrent.BitTorrent.track
+import BitTorrent.track
 # Ethan's Code End
 
 class Application(object):
