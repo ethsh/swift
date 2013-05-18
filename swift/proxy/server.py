@@ -46,7 +46,10 @@ from swift.common.swob import HTTPBadRequest, HTTPForbidden, \
 # Ethan's Code
 # import resource
 # resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
-# import BitTorrent.BitTorrent.track
+#Note: BitTorrent hijacks our stderr, reclaim it
+from BitTorrent import reset_stderr
+reset_stderr()
+import BitTorrent.BitTorrent.track
 # Ethan's Code End
 
 class Application(object):
