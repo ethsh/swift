@@ -58,7 +58,7 @@ class TrackerThread (threading.Thread):
         self.port = port
         self.dfile = dstate
     def run(self):
-        track(['--port', self.port, '--dfile', self.dfile])
+        BitTorrent.track(['--port', self.port, '--dfile', self.dfile])
 
 # Ethan's Code End
 
@@ -139,9 +139,9 @@ class Application(object):
         self.torrents_request_suffix = '?torrent'
         self.tracker_port = '6969';
         self.dfile = 'dstate';
-        # self.tracker_thread = TrackerThread(self.tracker_port, self.dfile)
-        # self.tracker_thread.start()
-        track(['--port', self.tracker_port, '--dfile', self.dfile])
+        self.tracker_thread = TrackerThread(self.tracker_port, self.dfile)
+        self.tracker_thread.start()
+        #track(['--port', self.tracker_port, '--dfile', self.dfile])
         #Ethan's code end
         
 
