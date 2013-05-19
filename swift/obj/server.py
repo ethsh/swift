@@ -47,7 +47,10 @@ from swift.common.swob import HTTPAccepted, HTTPBadRequest, HTTPCreated, \
     HTTPPreconditionFailed, HTTPRequestTimeout, HTTPUnprocessableEntity, \
     HTTPClientDisconnect, HTTPMethodNotAllowed, Request, Response, UTC, \
     HTTPInsufficientStorage, HTTPForbidden, multi_range_iterator
-
+# Ethan's Code here
+# from BitTorrent import reset_stderr
+# reset_stderr()
+# Ethan's Code end
 
 DATADIR = 'objects'
 ASYNCDIR = 'async_pending'
@@ -146,7 +149,9 @@ class DiskFile(object):
                 break
         if not self.data_file:
             return
+        # Ethan's Code
         print self.data_file
+        # Ethan's COde End
         self.fp = open(self.data_file, 'rb')
         self.metadata = read_metadata(self.fp)
         if not keep_data_fp:
