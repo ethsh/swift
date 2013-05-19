@@ -50,7 +50,7 @@ from swift.common.swob import HTTPBadRequest, HTTPForbidden, \
 import threading
 from BitTorrent import reset_stderr
 reset_stderr()
-import BitTorrent.track
+from BitTorrent.track import track
 
 class TrackerThread (threading.Thread):
     def __init__(self, port, dstate):
@@ -58,7 +58,7 @@ class TrackerThread (threading.Thread):
         self.port = port
         self.dfile = dstate
     def run(self):
-        BitTorrent.track(['--port', self.port, '--dfile', self.dfile])
+        track(['--port', self.port, '--dfile', self.dfile])
 
 # Ethan's Code End
 
