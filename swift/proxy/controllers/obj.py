@@ -539,7 +539,11 @@ class ObjectController(Controller):
     def TORRENT(self, req):
         """Handler for HTTP HEAD requests."""
         req.method = 'GET'
-        return self.GETorHEAD(req)
+        resp = self.GETorHEAD(req)
+        if resp.content_length>0:
+            # Start seeder somehow
+            pass
+        return resp
     # Ethan's code end
 
     @public

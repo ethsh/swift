@@ -146,6 +146,7 @@ class DiskFile(object):
                 break
         if not self.data_file:
             return
+        print self.data_file
         self.fp = open(self.data_file, 'rb')
         self.metadata = read_metadata(self.fp)
         if not keep_data_fp:
