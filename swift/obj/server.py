@@ -150,7 +150,8 @@ class DiskFile(object):
         if not self.data_file:
             return
         # Ethan's Code
-        print self.data_file
+        # print self.name
+        # print self.data_file
         # Ethan's COde End
         self.fp = open(self.data_file, 'rb')
         self.metadata = read_metadata(self.fp)
@@ -853,6 +854,16 @@ class ObjectController(object):
         if 'Content-Encoding' in file.metadata:
             response.content_encoding = file.metadata['Content-Encoding']
         return response
+
+    # Ethan's Code Here
+    @public
+    @timing_stats()
+    def TORRENT(self, request):
+        request.method = 'GET'
+        return self.GET(request)
+    
+    # Ethan's Code end
+
 
     @public
     @timing_stats()
