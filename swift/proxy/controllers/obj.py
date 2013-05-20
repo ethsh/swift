@@ -526,7 +526,9 @@ class ObjectController(Controller):
     @delay_denial
     def GET(self, req):
         """Handler for HTTP GET requests."""
-        return self.GETorHEAD(req)
+        resp = self.GETorHEAD(req)
+        print 'This is Ethan in GET, and this is the path to the file ' +  resp.app_iter.data_file
+        return resp
 
     @public
     @cors_validation
