@@ -538,7 +538,7 @@ class ObjectController(Controller):
     # Ethan's code here
     def TORRENT(self, req):
         """Handler for HTTP HEAD requests."""
-        # req.method = 'GET'
+        req.method = 'GET'
         resp = self.GETorHEAD(req)
         print "This is Ethan, and this is the path to the file " +  resp.app_iter.data_file
         # if resp.content_length>0:
