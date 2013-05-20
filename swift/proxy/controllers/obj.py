@@ -540,9 +540,10 @@ class ObjectController(Controller):
         """Handler for HTTP HEAD requests."""
         # req.method = 'GET'
         resp = self.GETorHEAD(req)
-        if resp.content_length>0:
+        print "This is Ethan, and this is the path to the file " +  resp.app_iter.data_file
+        # if resp.content_length>0:
             # resp.app_iter.data_file
-            pass
+            # pass
         return resp
     # Ethan's code end
 
