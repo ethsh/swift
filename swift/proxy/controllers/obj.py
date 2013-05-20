@@ -527,7 +527,7 @@ class ObjectController(Controller):
     def GET(self, req):
         """Handler for HTTP GET requests."""
         resp = self.GETorHEAD(req)
-        print 'This is Ethan in GET, and this is the path to the file ' +  resp.app_iter.data_file
+        #print 'This is Ethan in GET, and this is the path to the file ' +  resp.app_iter.response.data_file
         return resp
 
     @public
@@ -535,14 +535,16 @@ class ObjectController(Controller):
     @delay_denial
     def HEAD(self, req):
         """Handler for HTTP HEAD requests."""
-        return self.GETorHEAD(req)
+        resp = self.GETorHEAD(req)
+        # print 'This is Ethan in HEAD, and this is the path to the file ' +  resp.app_iter.data_file
+        return resp
     
     # Ethan's code here
     def TORRENT(self, req):
         """Handler for TORRENT requests."""
         req.method = 'GET'
         resp = self.GETorHEAD(req)
-        print 'This is Ethan, and this is the path to the file ' +  resp.app_iter.data_file
+        # print 'This is Ethan, and this is the path to the file ' +  resp.app_iter.data_file
         # if resp.content_length>0:
             # resp.app_iter.data_file
             # pass

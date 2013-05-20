@@ -153,6 +153,8 @@ class DiskFile(object):
         # print self.name
         # print self.data_file
         # Ethan's COde End
+        
+        print "This is Ethan in DiskFile. The path is " + self.data_file
         self.fp = open(self.data_file, 'rb')
         self.metadata = read_metadata(self.fp)
         if not keep_data_fp:
