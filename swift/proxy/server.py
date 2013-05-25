@@ -223,7 +223,8 @@ class Application(object):
                 # Ethan's code in here
                 isTorrentRequest = req.path.endswith(self.torrents_request_suffix);
                 if isTorrentRequest:
-                    req.environ['REQUEST_METHOD'] = 'TORRENT'
+                    req.method = 'TORRENT'
+                    # req.environ['REQUEST_METHOD'] = 'TORRENT'
                     req.path = req.path[:-len(self.torrents_request_suffix)]
                 #Ethan's code end
                 controller, path_parts = self.get_controller(req.path)
