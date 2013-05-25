@@ -527,6 +527,7 @@ class ObjectController(Controller):
     def GET(self, req):
         """Handler for HTTP GET requests."""
         resp = self.GETorHEAD(req)
+        print 'This is Ethan GET, and this is the path to the file ' +  resp.vars()
         #print 'This is Ethan in GET, and this is the path to the file ' +  resp.app_iter.response.data_file
         return resp
 
@@ -544,7 +545,7 @@ class ObjectController(Controller):
         """Handler for TORRENT requests."""
         req.method = 'GET'
         resp = self.GETorHEAD(req)
-        print 'This is Ethan, and this is the path to the file ' +  resp
+        print 'This is Ethan, and this is the path to the file ' +  resp.vars()
         # if resp.content_length>0:
             # resp.app_iter.data_file
             # pass
