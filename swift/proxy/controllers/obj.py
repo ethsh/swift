@@ -527,7 +527,7 @@ class ObjectController(Controller):
     def GET(self, req):
         """Handler for HTTP GET requests."""
         resp = self.GETorHEAD(req)
-        print 'This is Ethan GET, and this is the path to the file ' +  resp.vars()
+        print 'This is Ethan GET, and this is the path to the file ' +  resp.headers + ' ' + len(resp.body)
         #print 'This is Ethan in GET, and this is the path to the file ' +  resp.app_iter.response.data_file
         return resp
 
