@@ -544,7 +544,7 @@ class ObjectController(Controller):
         """Handler for TORRENT requests."""
         req.method = 'GET'
         resp = self.GETorHEAD(req)
-        # print 'This is Ethan, and this is the path to the file ' +  resp.app_iter.data_file
+        print 'This is Ethan, and this is the path to the file ' +  resp
         # if resp.content_length>0:
             # resp.app_iter.data_file
             # pass
