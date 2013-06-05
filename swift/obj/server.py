@@ -53,42 +53,6 @@ from BitTorrent import reset_stderr
 reset_stderr()
 from BitTorrent.makemetafile import make_meta_files
 import threading
-from BitTorrent import GetTorrent
-from BitTorrent.defaultargs import get_defaults
-from BitTorrent import configfile
-# from BitTorrent.bittorrent-console import TorrentApp
-from BTL.platform import decode_from_filesystem, encode_for_filesystem
-from BitTorrent.platform import get_dot_dir
-from BTL.bencode import bencode, bdecode
-
-from BitTorrent.translation import _
-import sys
-import os
-from cStringIO import StringIO
-import logging
-from logging import ERROR, WARNING
-from time import strftime, sleep
-import traceback
-import BTL.stackthreading as threading
-from BTL.platform import decode_from_filesystem, encode_for_filesystem
-from BitTorrent.platform import get_dot_dir
-from BTL.defer import DeferredEvent
-from BitTorrent import inject_main_logfile
-from BitTorrent.MultiTorrent import Feedback, MultiTorrent
-from BitTorrent.defaultargs import get_defaults
-from BitTorrent.parseargs import printHelp
-from BitTorrent.prefs import Preferences
-from BitTorrent import configfile
-from BitTorrent import BTFailure, UserFailure
-from BitTorrent import version
-from BitTorrent import GetTorrent
-from BTL.ConvertedMetainfo import ConvertedMetainfo
-from BitTorrent.MultiTorrent import TorrentNotInitialized
-from BitTorrent.RawServer_twisted import RawServer
-from twisted.internet import task
-from BitTorrent.UI import Size, Duration
-from BitTorrent import console
-
 # Ethan's Code end
 
 
@@ -834,8 +798,8 @@ class ObjectController(object):
         # Ethan adding the torrent to the request
         ip = 'http://192.168.28.128:6969'
         save_as = file.data_file
-        response.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
-        response.headers['torrent_length'] = len(response.headers['torrent'])
+        # response.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
+        # response.headers['torrent_length'] = len(response.headers['torrent'])
         
         # response.body = bencode(make_meta_files(ip, [file.data_file]))
         # self.seeder_thread = SeederThread(ip, save_as, bencode(make_meta_files(ip, [file.data_file])))
