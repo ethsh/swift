@@ -759,7 +759,10 @@ class Request(object):
             'wsgi.url_scheme': parsed_path.scheme or 'http',
             'wsgi.errors': StringIO(''),
             'wsgi.multithread': False,
-            'wsgi.multiprocess': False
+            'wsgi.multiprocess': False,
+            # Ethan's code
+            # 'IS_TORRENT_REQUEST': False
+            # Ethan's code end
         }
         env.update(environ)
         if body is not None:
@@ -925,7 +928,7 @@ class Response(object):
     charset = _resp_charset_property()
     app_iter = _resp_app_iter_property()
 
-    def __init__(self, body=None, status=200, headers=None, app_iter=None,
+    def __init__(self, body=None, status=200, headers={}, app_iter=None,
                  request=None, conditional_response=False, **kw):
         self.headers = HeaderKeyDict(
             [('Content-Type', 'text/html; charset=UTF-8')])
@@ -939,8 +942,7 @@ class Response(object):
             self.environ = request.environ
         else:
             self.environ = {}
-        if headers:
-            self.headers.update(headers)
+        self.headers.update(headers)
         for key, value in kw.iteritems():
             setattr(self, key, value)
 

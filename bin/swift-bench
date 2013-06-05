@@ -50,6 +50,7 @@ CONF_DEFAULTS = {
     'devices': 'sdb1',  # space-sep list
     'log_level': 'INFO',
     'timeout': '10',
+    'auth_version': '1.0',
     'bench_clients': [],
 }
 

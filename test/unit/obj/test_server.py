@@ -224,7 +224,7 @@ class TestDiskFile(unittest.TestCase):
                 'X-Timestamp': timestamp,
                 'Content-Length': str(os.fstat(fd).st_size),
             }
-            df.put(fd, fsize, metadata, extension=extension)
+            df.put(fd, metadata, extension=extension)
             if invalid_type == 'ETag':
                 etag = md5()
                 etag.update('1' + '0' * (fsize - 1))
@@ -660,24 +660,6 @@ class TestObjectController(unittest.TestCase):
         del req.headers['Content-Length']
         resp = self.object_controller.PUT(req)
         self.assertEquals(resp.status_int, 411)
-
-    def test_PUT_zero_content_length(self):
-        req = Request.blank('/sda1/p/a/c/o', environ={'REQUEST_METHOD': 'PUT'},
-                headers={'X-Timestamp': normalize_timestamp(time()),
-                         'Content-Type': 'application/octet-stream'})
-        req.body = ''
-        self.assertEquals(req.headers['Content-Length'], '0')
-        resp = self.object_controller.PUT(req)
-        self.assertEquals(resp.status_int, 201)
-
-    def test_PUT_zero_content_length_mismatched(self):
-        req = Request.blank('/sda1/p/a/c/o', environ={'REQUEST_METHOD': 'PUT'},
-                headers={'X-Timestamp': normalize_timestamp(time()),
-                         'Content-Type': 'application/octet-stream'})
-        req.body = 'VERIFY'
-        req.headers['Content-Length'] = '0'
-        resp = self.object_controller.PUT(req)
-        self.assertEquals(resp.status_int, 499)
 
     def test_PUT_common(self):
         timestamp = normalize_timestamp(time())

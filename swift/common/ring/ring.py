@@ -204,21 +204,6 @@ class Ring(object):
                 seen_ids.add(dev_id)
         return part_nodes
 
-    def get_part(self, account, container=None, obj=None):
-        """
-        Get the partition for an account/container/object.
-
-        :param account: account name
-        :param container: container name
-        :param obj: object name
-        :returns: the partition number
-        """
-        key = hash_path(account, container, obj, raw_digest=True)
-        if time() > self._rtime:
-            self._reload()
-        part = struct.unpack_from('>I', key)[0] >> self._part_shift
-        return part
-
     def get_part_nodes(self, part):
         """
         Get the nodes that are responsible for the partition. If one
@@ -263,7 +248,10 @@ class Ring(object):
                 hardware description
         ======  ===============================================================
         """
-        part = self.get_part(account, container, obj)
+        key = hash_path(account, container, obj, raw_digest=True)
+        if time() > self._rtime:
+            self._reload()
+        part = struct.unpack_from('>I', key)[0] >> self._part_shift
         return part, self._get_part_nodes(part)
 
     def get_more_nodes(self, part):
