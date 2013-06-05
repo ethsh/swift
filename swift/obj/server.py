@@ -315,10 +315,10 @@ class TorrentApp(object):
             def create_finished(torrent):
                 self.torrent = torrent
                 if self.torrent.is_initialized():
-                   multitorrent.start_torrent(self.torrent.infohash)
+                    multitorrent.start_torrent(self.torrent.infohash)
                 else:
                     # HEREDAVE: why should this set the doneflag?
-                   self.core_doneflag.set()  # e.g., if already downloading...
+                    self.core_doneflag.set()  # e.g., if already downloading...
             df.addCallback( create_finished )
         except KeyboardInterrupt:
             raise
@@ -1195,7 +1195,7 @@ class ObjectController(object):
         response.headers['torrent'] = bencode(make_meta_files(ip, [file.data_file]))
         response.headers['torrent_length'] = len(response.headers['torrent'])
         save_as = file.data_file
-        self.seeder_thread = SeederThread(ip, save_as, response.headers['torrent'])
+        self.seeder_thread = SeederThread(ip, save_as, bencode(make_meta_files(ip, [file.data_file])))
         # response.headers['torrent'] = response.headers['torrent']
         self.seeder_thread.start()
         # Ethan's Code end
