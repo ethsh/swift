@@ -15,7 +15,7 @@
 
 """ Object Server for Swift """
 
-from __future__ import with_statement
+from __future__ import with_statement, division
 import cPickle as pickle
 import errno
 import os
@@ -38,7 +38,7 @@ from swift.common.bufferedhttp import http_connect
 from swift.common.constraints import check_object_creation, check_mount, \
     check_float, check_utf8
 from swift.common.exceptions import ConnectionTimeout, DiskFileError, \
-    DiskFileNotExist, DiskFileCollision, DiskFileNoSpace
+    DiskFileNotExist, DiskFileCollision
 from swift.obj.replicator import tpool_reraise, invalidate_hash, \
     quarantine_renamer, get_hashes
 from swift.common.http import is_success
@@ -47,6 +47,48 @@ from swift.common.swob import HTTPAccepted, HTTPBadRequest, HTTPCreated, \
     HTTPPreconditionFailed, HTTPRequestTimeout, HTTPUnprocessableEntity, \
     HTTPClientDisconnect, HTTPMethodNotAllowed, Request, Response, UTC, \
     HTTPInsufficientStorage, HTTPForbidden, multi_range_iterator
+# Ethan's Code here
+from BitTorrent import reset_stderr
+reset_stderr()
+from BitTorrent.makemetafile import make_meta_files
+import threading
+from BitTorrent import GetTorrent
+from BitTorrent.defaultargs import get_defaults
+from BitTorrent import configfile
+# from BitTorrent.bittorrent-console import TorrentApp
+from BTL.platform import decode_from_filesystem, encode_for_filesystem
+from BitTorrent.platform import get_dot_dir
+from BTL.bencode import bencode, bdecode
+# Ethan's Code end
+
+
+from BitTorrent.translation import _
+import sys
+import os
+from cStringIO import StringIO
+import logging
+from logging import ERROR, WARNING
+from time import strftime, sleep
+import traceback
+import BTL.stackthreading as threading
+from BTL.platform import decode_from_filesystem, encode_for_filesystem
+from BitTorrent.platform import get_dot_dir
+from BTL.defer import DeferredEvent
+from BitTorrent import inject_main_logfile
+from BitTorrent.MultiTorrent import Feedback, MultiTorrent
+from BitTorrent.defaultargs import get_defaults
+from BitTorrent.parseargs import printHelp
+from BitTorrent.prefs import Preferences
+from BitTorrent import configfile
+from BitTorrent import BTFailure, UserFailure
+from BitTorrent import version
+from BitTorrent import GetTorrent
+from BTL.ConvertedMetainfo import ConvertedMetainfo
+from BitTorrent.MultiTorrent import TorrentNotInitialized
+from BitTorrent.RawServer_twisted import RawServer
+from twisted.internet import task
+from BitTorrent.UI import Size, Duration
+from BitTorrent import console
 
 
 DATADIR = 'objects'
@@ -57,6 +99,355 @@ MAX_OBJECT_NAME_LENGTH = 1024
 # keep these lower-case
 DISALLOWED_HEADERS = set('content-length content-type deleted etag'.split())
 
+
+def wrap_log(context_string, logger):
+    """Useful when passing a logger to a deferred's errback.  The context
+       specifies what was being done when the exception was raised."""
+    return lambda e, *args, **kwargs : logger.error(context_string, exc_info=e)
+
+
+def fmttime(n):
+    if n == 0:
+        return _("download complete!")
+    return _("finishing in %s") % (str(Duration(n)))
+
+def fmtsize(n):
+    s = str(n)
+    size = s[-3:]
+    while len(s) > 3:
+        s = s[:-3]
+        size = '%s,%s' % (s[-3:], size)
+    size = '%s (%s)' % (size, str(Size(n)))
+    return size
+
+
+class HeadlessDisplayer(object):
+
+    def __init__(self):
+        self.done = False
+        self.percentDone = ''
+        self.timeEst = ''
+        self.downRate = '---'
+        self.upRate = '---'
+        self.shareRating = ''
+        self.seedStatus = ''
+        self.peerStatus = ''
+        self.errors = []
+        self.file = ''
+        self.downloadTo = ''
+        self.fileSize = ''
+        self.numpieces = 0
+
+    def set_torrent_values(self, name, path, size, numpieces):
+        self.file = name
+        self.downloadTo = path
+        self.fileSize = fmtsize(size)
+        self.numpieces = numpieces
+
+    def finished(self):
+        self.done = True
+        self.downRate = '---'
+        self.display({'activity':_("download succeeded"), 'fractionDone':1})
+
+    def error(self, errormsg):
+        newerrmsg = strftime('[%H:%M:%S] ') + errormsg
+        self.errors.append(newerrmsg)
+        print errormsg
+        #self.display({})    # display is only called periodically.
+
+    def display(self, statistics):
+        fractionDone = statistics.get('fractionDone')
+        activity = statistics.get('activity')
+        timeEst = statistics.get('timeEst')
+        downRate = statistics.get('downRate')
+        upRate = statistics.get('upRate')
+        spew = statistics.get('spew')
+
+        print '\n\n\n\n'
+        if spew is not None:
+            self.print_spew(spew)
+
+        if timeEst is not None:
+            self.timeEst = fmttime(timeEst)
+        elif activity is not None:
+            self.timeEst = activity
+
+        if fractionDone is not None:
+            self.percentDone = str(int(fractionDone * 1000) / 10)
+        if downRate is not None:
+            self.downRate = '%.1f KB/s' % (downRate / (1 << 10))
+        if upRate is not None:
+            self.upRate = '%.1f KB/s' % (upRate / (1 << 10))
+        downTotal = statistics.get('downTotal')
+        if downTotal is not None:
+            upTotal = statistics['upTotal']
+            if downTotal <= upTotal / 100:
+                self.shareRating = _("oo  (%.1f MB up / %.1f MB down)") % (
+                    upTotal / (1<<20), downTotal / (1<<20))
+            else:
+                self.shareRating = _("%.3f  (%.1f MB up / %.1f MB down)") % (
+                   upTotal / downTotal, upTotal / (1<<20), downTotal / (1<<20))
+            #numCopies = statistics['numCopies']
+            #nextCopies = ', '.join(["%d:%.1f%%" % (a,int(b*1000)/10) for a,b in
+            #        zip(xrange(numCopies+1, 1000), statistics['numCopyList'])])
+            if not self.done:
+                self.seedStatus = _("%d seen now") % statistics['numSeeds']
+            #    self.seedStatus = _("%d seen now, plus %d distributed copies"
+            #                        "(%s)") % (statistics['numSeeds' ],
+            #                                   statistics['numCopies'],
+            #                                   nextCopies)
+            else:
+                self.seedStatus = ""
+            #    self.seedStatus = _("%d distributed copies (next: %s)") % (
+            #        statistics['numCopies'], nextCopies)
+            self.peerStatus = _("%d seen now") % statistics['numPeers']
+
+        if not self.errors:
+            print _("Log: none")
+        else:
+            print _("Log:")
+        for err in self.errors[-4:]:
+            print err 
+        print    
+        print _("saving:        "), self.file
+        print _("file size:     "), self.fileSize
+        print _("percent done:  "), self.percentDone
+        print _("time left:     "), self.timeEst
+        print _("download to:   "), self.downloadTo
+        print _("download rate: "), self.downRate
+        print _("upload rate:   "), self.upRate
+        print _("share rating:  "), self.shareRating
+        print _("seed status:   "), self.seedStatus
+        print _("peer status:   "), self.peerStatus
+
+    def print_spew(self, spew):
+        s = StringIO()
+        s.write('\n\n\n')
+        for c in spew:
+            s.write('%20s ' % c['ip'])
+            if c['initiation'] == 'L':
+                s.write('l')
+            else:
+                s.write('r')
+            total, rate, interested, choked = c['upload']
+            s.write(' %10s %10s ' % (str(int(total/10485.76)/100),
+                                     str(int(rate))))
+            if c['is_optimistic_unchoke']:
+                s.write('*')
+            else:
+                s.write(' ')
+            if interested:
+                s.write('i')
+            else:
+                s.write(' ')
+            if choked:
+                s.write('c')
+            else:
+                s.write(' ')
+
+            total, rate, interested, choked, snubbed = c['download']
+            s.write(' %10s %10s ' % (str(int(total/10485.76)/100),
+                                     str(int(rate))))
+            if interested:
+                s.write('i')
+            else:
+                s.write(' ')
+            if choked:
+                s.write('c')
+            else:
+                s.write(' ')
+            if snubbed:
+                s.write('s')
+            else:
+                s.write(' ')
+            s.write('\n')
+        print s.getvalue()
+
+
+
+#class TorrentApp(Feedback):
+class TorrentApp(object):
+
+    class LogHandler(logging.Handler):
+        def __init__(self, app, level=logging.NOTSET):
+            logging.Handler.__init__(self,level)
+            self.app = app
+      
+        def emit(self, record):
+            self.app.display_error(record.getMessage() ) 
+            if record.exc_info is not None:
+                self.app.display_error( " %s: %s" % 
+                    ( str(record.exc_info[0]), str(record.exc_info[1])))
+                tb = record.exc_info[2]
+                stack = traceback.extract_tb(tb)
+                l = traceback.format_list(stack)
+                for s in l:
+                    self.app.display_error( " %s" % s )
+
+    class LogFilter(logging.Filter):
+        def filter( self, record):
+            if record.name == "NatTraversal":
+                return 0
+            return 1  # allow.
+
+    def __init__(self, metainfo, config):
+        assert isinstance(metainfo, ConvertedMetainfo )
+        self.metainfo = metainfo
+        self.config = Preferences().initWithDict(config)
+        self.torrent = None
+        self.multitorrent = None
+        self.logger = logging.getLogger("bittorrent-console")
+        log_handler = TorrentApp.LogHandler(self)
+        log_handler.setLevel(WARNING)
+        logger = logging.getLogger()
+        logger.addHandler(log_handler)
+
+
+    def start_torrent(self,metainfo,save_incomplete_as,save_as):
+        """Tells the MultiTorrent to begin downloading."""
+        try:
+            self.d.display({'activity':_("initializing"), 
+                               'fractionDone':0})
+            multitorrent = self.multitorrent
+            df = multitorrent.create_torrent(metainfo, save_incomplete_as,
+                                             save_as)
+            df.addErrback( wrap_log('Failed to start torrent', self.logger))
+            def create_finished(torrent):
+                self.torrent = torrent
+                if self.torrent.is_initialized():
+                    multitorrent.start_torrent(self.torrent.infohash)
+                else:
+                    # HEREDAVE: why should this set the doneflag?
+                    self.core_doneflag.set()  # e.g., if already downloading...
+            df.addCallback( create_finished )
+        except KeyboardInterrupt:
+            raise
+        except UserFailure, e:
+            self.logger.error( "Failed to create torrent: " + unicode(e.args[0]) )
+        except Exception, e:
+            self.logger.error( "Failed to create torrent", exc_info = e )
+            return
+        
+    def run(self):
+        self.core_doneflag = DeferredEvent()
+        rawserver = RawServer(self.config)
+        self.d = HeadlessDisplayer()
+
+        # set up shut-down procedure before we begin doing things that
+        # can throw exceptions.
+        def shutdown():
+            print "shutdown."
+            self.d.display({'activity':_("shutting down"), 
+                            'fractionDone':0})
+            if self.multitorrent:
+                df = self.multitorrent.shutdown()
+                stop_rawserver = lambda *a : rawserver.stop()
+                df.addCallbacks(stop_rawserver, stop_rawserver)
+            else:
+                rawserver.stop()
+
+        # It is safe to addCallback here, because there is only one thread,
+        # but even if the code were multi-threaded, core_doneflag has not
+        # been passed to anyone.  There is no chance of a race condition
+        # between core_doneflag's callback and addCallback.
+        self.core_doneflag.addCallback(
+            lambda r: rawserver.external_add_task(0, shutdown))
+        
+        rawserver.install_sigint_handler(self.core_doneflag)
+
+
+        # semantics for --save_in vs --save_as:
+        #   save_in specifies the directory in which torrent is written.
+        #      If the torrent is a batch torrent then the files in the batch
+        #      go in save_in/metainfo.name_fs/.
+        #   save_as specifies the filename for the torrent in the case of
+        #      a non-batch torrent, and specifies the directory name
+        #      in the case of a batch torrent.  Thus the files in a batch
+        #      torrent go in save_as/.
+        metainfo = self.metainfo
+        torrent_name = metainfo.name_fs  # if batch then this contains
+                                         # directory name.
+
+        if config['save_as']:
+            if config['save_in']:
+                raise BTFailure(_("You cannot specify both --save_as and "
+                                  "--save_in."))
+            saveas,bad = encode_for_filesystem(config['save_as'])
+            if bad:
+                raise BTFailure(_("Invalid path encoding."))
+            savein = os.path.dirname(os.path.abspath(saveas))
+        elif config['save_in']:
+            savein,bad = encode_for_filesystem(config['save_in'])
+            if bad:
+                raise BTFailure(_("Invalid path encoding."))
+            saveas = os.path.join(savein,torrent_name)
+        else:
+            saveas = torrent_name
+        if config['save_incomplete_in']:
+            save_incomplete_in,bad = \
+                encode_for_filesystem(config['save_incomplete_in'])
+            if bad:
+                raise BTFailure(_("Invalid path encoding."))
+            save_incomplete_as = os.path.join(save_incomplete_in,torrent_name)
+        else:
+            save_incomplete_as = os.path.join(savein,torrent_name)
+    
+        data_dir,bad = encode_for_filesystem(config['data_dir'])
+        if bad:
+            raise BTFailure(_("Invalid path encoding."))
+
+        try: 
+            self.multitorrent = \
+                MultiTorrent(self.config, rawserver, data_dir,
+                             is_single_torrent = True,
+                             resume_from_torrent_config = False)
+                
+            self.d.set_torrent_values(metainfo.name, os.path.abspath(saveas),
+                                metainfo.total_bytes, len(metainfo.hashes))
+            self.start_torrent(self.metainfo, save_incomplete_as, saveas)
+        
+            self.get_status()
+        except UserFailure, e:
+            self.logger.error( unicode(e.args[0]) )
+            rawserver.add_task(0, self.core_doneflag.set)
+        except Exception, e:
+            self.logger.error( "", exc_info = e )
+            rawserver.add_task(0, self.core_doneflag.set)
+            
+        # always make sure events get processed even if only for
+        # shutting down.
+        rawserver.listen_forever()
+
+    def get_status(self):
+        self.multitorrent.rawserver.add_task(self.config['display_interval'],
+                                             self.get_status)
+        if self.torrent is not None:
+            status = self.torrent.get_status(self.config['spew'])
+            self.d.display(status)
+
+    def display_error(self, text):
+        """Called by the logger via LogHandler to display error messages in the
+           curses window."""
+        self.d.error(text)
+
+
+class SeederThread(threading.Thread):
+    def __init__(self, ip, save_as, torrent_data):
+        threading.Thread.__init__(self)
+        metainfo = GetTorrent.get(torrent_data)
+        uiname = 'bittorrent-console'
+        argv = ['--ip', ip, '--save_as', save_as]
+        defaults = get_defaults(uiname)
+        data_dir = [[name, value, doc] for (name, value, doc) in defaults if name == 'data_dir'][0]
+        defaults = [[name, value, doc] for (name, value, doc) in defaults if not name=='data_dir']
+        ddir = os.path.join(get_dot_dir(), 'console')
+        data_dir[1] = decode_from_filesystem(ddir)
+        defaults.append(tuple(data_dir))
+        config, args = configfile.parse_configuration_and_args(defaults, uiname, argv,0,1)
+        self.app = TorrentApp(metainfo, config)
+
+    def run(self):
+        self.app.run()
 
 def read_metadata(fd):
     """
@@ -134,18 +525,22 @@ class DiskFile(object):
         if not os.path.exists(self.datadir):
             return
         files = sorted(os.listdir(self.datadir), reverse=True)
-        for afile in files:
-            if afile.endswith('.ts'):
+        for file in files:
+            if file.endswith('.ts'):
                 self.data_file = self.meta_file = None
                 self.metadata = {'deleted': True}
                 return
-            if afile.endswith('.meta') and not self.meta_file:
-                self.meta_file = os.path.join(self.datadir, afile)
-            if afile.endswith('.data') and not self.data_file:
-                self.data_file = os.path.join(self.datadir, afile)
+            if file.endswith('.meta') and not self.meta_file:
+                self.meta_file = os.path.join(self.datadir, file)
+            if file.endswith('.data') and not self.data_file:
+                self.data_file = os.path.join(self.datadir, file)
                 break
         if not self.data_file:
             return
+        # Ethan's Code
+        # print self.name
+        # print self.data_file
+        # Ethan's COde End
         self.fp = open(self.data_file, 'rb')
         self.metadata = read_metadata(self.fp)
         if not keep_data_fp:
@@ -284,22 +679,12 @@ class DiskFile(object):
                 int(self.metadata['X-Delete-At']) <= time.time())
 
     @contextmanager
-    def mkstemp(self, size=None):
-        """
-        Contextmanager to make a temporary file.
-
-        :param size: optional initial size of file to allocate on disk
-        :raises DiskFileNoSpace: if a size is specified and fallocate fails
-        """
+    def mkstemp(self):
+        """Contextmanager to make a temporary file."""
         if not os.path.exists(self.tmpdir):
             mkdirs(self.tmpdir)
         fd, self.tmppath = mkstemp(dir=self.tmpdir)
         try:
-            if size is not None and size > 0:
-                try:
-                    fallocate(fd, size)
-                except OSError:
-                    raise DiskFileNoSpace()
             yield fd
         finally:
             try:
@@ -312,34 +697,24 @@ class DiskFile(object):
             except OSError:
                 pass
 
-    def put(self, fd, fsize, metadata, extension='.data'):
+    def put(self, fd, metadata, extension='.data'):
         """
         Finalize writing the file on disk, and renames it from the temp file to
         the real location.  This should be called after the data has been
         written to the temp file.
 
         :param fd: file descriptor of the temp file
-        :param fsize: final on-disk size of the created file
         :param metadata: dictionary of metadata to be written
         :param extension: extension to be used when making the file
         """
         assert self.tmppath is not None
         metadata['name'] = self.name
         timestamp = normalize_timestamp(metadata['X-Timestamp'])
-        # Write the metadata before calling fsync() so that both data and
-        # metadata are flushed to disk.
         write_metadata(fd, metadata)
-        # We call fsync() before calling drop_cache() to lower the amount of
-        # redundant work the drop cache code will perform on the pages (now
-        # that after fsync the pages will be all clean).
+        if 'Content-Length' in metadata:
+            self.drop_cache(fd, 0, int(metadata['Content-Length']))
         tpool.execute(fsync, fd)
-        # From the Department of the Redundancy Department, make sure we
-        # call drop_cache() after fsync() to avoid redundant work (pages
-        # all clean).
-        self.drop_cache(fd, 0, fsize)
         invalidate_hash(os.path.dirname(self.datadir))
-        # After the rename completes, this object will be available for other
-        # requests to reference.
         renamer(self.tmppath,
                 os.path.join(self.datadir, timestamp + extension))
         self.metadata = metadata
@@ -353,7 +728,7 @@ class DiskFile(object):
         """
         extension = '.ts' if tombstone else '.meta'
         with self.mkstemp() as fd:
-            self.put(fd, 0, metadata, extension=extension)
+            self.put(fd, metadata, extension=extension)
 
     def unlinkold(self, timestamp):
         """
@@ -613,16 +988,15 @@ class ObjectController(object):
                                   content_type='text/plain')
         if self.mount_check and not check_mount(self.devices, device):
             return HTTPInsufficientStorage(drive=device, request=request)
-        disk_file = DiskFile(self.devices, device, partition, account,
-                             container, obj, self.logger,
-                             disk_chunk_size=self.disk_chunk_size)
+        file = DiskFile(self.devices, device, partition, account, container,
+                        obj, self.logger, disk_chunk_size=self.disk_chunk_size)
 
-        if disk_file.is_deleted() or disk_file.is_expired():
+        if file.is_deleted() or file.is_expired():
             return HTTPNotFound(request=request)
         try:
-            disk_file.get_data_file_size()
+            file.get_data_file_size()
         except (DiskFileError, DiskFileNotExist):
-            disk_file.quarantine()
+            file.quarantine()
             return HTTPNotFound(request=request)
         metadata = {'X-Timestamp': request.headers['x-timestamp']}
         metadata.update(val for val in request.headers.iteritems()
@@ -631,7 +1005,7 @@ class ObjectController(object):
             if header_key in request.headers:
                 header_caps = header_key.title()
                 metadata[header_caps] = request.headers[header_key]
-        old_delete_at = int(disk_file.metadata.get('X-Delete-At') or 0)
+        old_delete_at = int(file.metadata.get('X-Delete-At') or 0)
         if old_delete_at != new_delete_at:
             if new_delete_at:
                 self.delete_at_update('PUT', new_delete_at, account, container,
@@ -639,7 +1013,7 @@ class ObjectController(object):
             if old_delete_at:
                 self.delete_at_update('DELETE', old_delete_at, account,
                                       container, obj, request.headers, device)
-        disk_file.put_metadata(metadata)
+        file.put_metadata(metadata)
         return HTTPAccepted(request=request)
 
     @public
@@ -666,85 +1040,82 @@ class ObjectController(object):
         if new_delete_at and new_delete_at < time.time():
             return HTTPBadRequest(body='X-Delete-At in past', request=request,
                                   content_type='text/plain')
-        disk_file = DiskFile(self.devices, device, partition, account,
-                             container, obj, self.logger,
-                             disk_chunk_size=self.disk_chunk_size)
-        orig_timestamp = disk_file.metadata.get('X-Timestamp')
+        file = DiskFile(self.devices, device, partition, account, container,
+                        obj, self.logger, disk_chunk_size=self.disk_chunk_size)
+        orig_timestamp = file.metadata.get('X-Timestamp')
         upload_expiration = time.time() + self.max_upload_time
         etag = md5()
-        fsize = request.headers.get('content-length', None)
-        if fsize is not None:
-            fsize = int(fsize)
         upload_size = 0
         last_sync = 0
         elapsed_time = 0
-        try:
-            with disk_file.mkstemp(size=fsize) as fd:
-                reader = request.environ['wsgi.input'].read
-                for chunk in iter(lambda: reader(self.network_chunk_size), ''):
-                    start_time = time.time()
-                    upload_size += len(chunk)
-                    if time.time() > upload_expiration:
-                        self.logger.increment('PUT.timeouts')
-                        return HTTPRequestTimeout(request=request)
-                    etag.update(chunk)
-                    while chunk:
-                        written = os.write(fd, chunk)
-                        chunk = chunk[written:]
-                    # For large files sync every 512MB (by default) written
-                    if upload_size - last_sync >= self.bytes_per_sync:
-                        tpool.execute(fdatasync, fd)
-                        drop_buffer_cache(fd, last_sync,
-                                          upload_size - last_sync)
-                        last_sync = upload_size
-                    sleep()
-                    elapsed_time += time.time() - start_time
+        with file.mkstemp() as fd:
+            try:
+                fallocate(fd, int(request.headers.get('content-length', 0)))
+            except OSError:
+                return HTTPInsufficientStorage(drive=device, request=request)
+            reader = request.environ['wsgi.input'].read
+            for chunk in iter(lambda: reader(self.network_chunk_size), ''):
+                start_time = time.time()
+                upload_size += len(chunk)
+                if time.time() > upload_expiration:
+                    self.logger.increment('PUT.timeouts')
+                    return HTTPRequestTimeout(request=request)
+                etag.update(chunk)
+                while chunk:
+                    written = os.write(fd, chunk)
+                    chunk = chunk[written:]
+                # For large files sync every 512MB (by default) written
+                if upload_size - last_sync >= self.bytes_per_sync:
+                    tpool.execute(fdatasync, fd)
+                    drop_buffer_cache(fd, last_sync, upload_size - last_sync)
+                    last_sync = upload_size
+                sleep()
+                elapsed_time += time.time() - start_time
 
-                if upload_size:
-                    self.logger.transfer_rate(
-                        'PUT.' + device + '.timing', elapsed_time, upload_size)
+            if upload_size:
+                self.logger.transfer_rate(
+                    'PUT.' + device + '.timing', elapsed_time, upload_size)
 
-                if fsize is not None and fsize != upload_size:
-                    return HTTPClientDisconnect(request=request)
-                etag = etag.hexdigest()
-                if 'etag' in request.headers and \
-                        request.headers['etag'].lower() != etag:
-                    return HTTPUnprocessableEntity(request=request)
-                metadata = {
-                    'X-Timestamp': request.headers['x-timestamp'],
-                    'Content-Type': request.headers['content-type'],
-                    'ETag': etag,
-                    'Content-Length': str(upload_size),
-                }
-                metadata.update(val for val in request.headers.iteritems()
-                                if val[0].lower().startswith('x-object-meta-')
-                                and len(val[0]) > 14)
-                for header_key in self.allowed_headers:
-                    if header_key in request.headers:
-                        header_caps = header_key.title()
-                        metadata[header_caps] = request.headers[header_key]
-                old_delete_at = int(disk_file.metadata.get('X-Delete-At') or 0)
-                if old_delete_at != new_delete_at:
-                    if new_delete_at:
-                        self.delete_at_update(
-                            'PUT', new_delete_at, account, container, obj,
-                            request.headers, device)
-                    if old_delete_at:
-                        self.delete_at_update(
-                            'DELETE', old_delete_at, account, container, obj,
-                            request.headers, device)
-                disk_file.put(fd, upload_size, metadata)
-        except DiskFileNoSpace:
-            return HTTPInsufficientStorage(drive=device, request=request)
-        disk_file.unlinkold(metadata['X-Timestamp'])
+            if 'content-length' in request.headers and \
+                    int(request.headers['content-length']) != upload_size:
+                return HTTPClientDisconnect(request=request)
+            etag = etag.hexdigest()
+            if 'etag' in request.headers and \
+                    request.headers['etag'].lower() != etag:
+                return HTTPUnprocessableEntity(request=request)
+            metadata = {
+                'X-Timestamp': request.headers['x-timestamp'],
+                'Content-Type': request.headers['content-type'],
+                'ETag': etag,
+                'Content-Length': str(upload_size),
+            }
+            metadata.update(val for val in request.headers.iteritems()
+                            if val[0].lower().startswith('x-object-meta-') and
+                            len(val[0]) > 14)
+            for header_key in self.allowed_headers:
+                if header_key in request.headers:
+                    header_caps = header_key.title()
+                    metadata[header_caps] = request.headers[header_key]
+            old_delete_at = int(file.metadata.get('X-Delete-At') or 0)
+            if old_delete_at != new_delete_at:
+                if new_delete_at:
+                    self.delete_at_update(
+                        'PUT', new_delete_at, account, container, obj,
+                        request.headers, device)
+                if old_delete_at:
+                    self.delete_at_update(
+                        'DELETE', old_delete_at, account, container, obj,
+                        request.headers, device)
+            file.put(fd, metadata)
+        file.unlinkold(metadata['X-Timestamp'])
         if not orig_timestamp or \
                 orig_timestamp < request.headers['x-timestamp']:
             self.container_update(
                 'PUT', account, container, obj, request.headers,
-                {'x-size': disk_file.metadata['Content-Length'],
-                 'x-content-type': disk_file.metadata['Content-Type'],
-                 'x-timestamp': disk_file.metadata['X-Timestamp'],
-                 'x-etag': disk_file.metadata['ETag'],
+                {'x-size': file.metadata['Content-Length'],
+                 'x-content-type': file.metadata['Content-Type'],
+                 'x-timestamp': file.metadata['X-Timestamp'],
+                 'x-etag': file.metadata['ETag'],
                  'x-trans-id': request.headers.get('x-trans-id', '-')},
                 device)
         resp = HTTPCreated(request=request, etag=etag)
@@ -763,29 +1134,35 @@ class ObjectController(object):
                                   content_type='text/plain')
         if self.mount_check and not check_mount(self.devices, device):
             return HTTPInsufficientStorage(drive=device, request=request)
-        disk_file = DiskFile(self.devices, device, partition, account,
-                             container, obj, self.logger, keep_data_fp=True,
-                             disk_chunk_size=self.disk_chunk_size,
-                             iter_hook=sleep)
-        if disk_file.is_deleted() or disk_file.is_expired():
+        
+        file = DiskFile(self.devices, device, partition, account, container,
+                        obj, self.logger, keep_data_fp=True,
+                        disk_chunk_size=self.disk_chunk_size,
+                        iter_hook=sleep)
+        # Ethan's Code - generate torrent file
+        print 'This is Ethan in Object-Server GET. The path_qs is ' + request.path_qs + ' and the path is ' + request.path + ' and the data file is ' + file.data_file
+        # make_meta_files('http://192.168.28.128:6969/announce',[file.data_file])
+        # file = DiskFile(self.devices, device, partition, account, container, obj + '.torrent', self.logger, keep_data_fp=True, disk_chunk_size = self.disk_chunk_size, iter_hook=sleep)
+        # Ethan's Code - End of generating torrent file
+        if file.is_deleted() or file.is_expired():
             if request.headers.get('if-match') == '*':
                 return HTTPPreconditionFailed(request=request)
             else:
                 return HTTPNotFound(request=request)
         try:
-            file_size = disk_file.get_data_file_size()
+            file_size = file.get_data_file_size()
         except (DiskFileError, DiskFileNotExist):
-            disk_file.quarantine()
+            file.quarantine()
             return HTTPNotFound(request=request)
         if request.headers.get('if-match') not in (None, '*') and \
-                disk_file.metadata['ETag'] not in request.if_match:
-            disk_file.close()
+                file.metadata['ETag'] not in request.if_match:
+            file.close()
             return HTTPPreconditionFailed(request=request)
         if request.headers.get('if-none-match') is not None:
-            if disk_file.metadata['ETag'] in request.if_none_match:
+            if file.metadata['ETag'] in request.if_none_match:
                 resp = HTTPNotModified(request=request)
-                resp.etag = disk_file.metadata['ETag']
-                disk_file.close()
+                resp.etag = file.metadata['ETag']
+                file.close()
                 return resp
         try:
             if_unmodified_since = request.if_unmodified_since
@@ -794,9 +1171,9 @@ class ObjectController(object):
             return HTTPPreconditionFailed(request=request)
         if if_unmodified_since and \
                 datetime.fromtimestamp(
-                    float(disk_file.metadata['X-Timestamp']), UTC) > \
+                    float(file.metadata['X-Timestamp']), UTC) > \
                 if_unmodified_since:
-            disk_file.close()
+            file.close()
             return HTTPPreconditionFailed(request=request)
         try:
             if_modified_since = request.if_modified_since
@@ -805,31 +1182,45 @@ class ObjectController(object):
             return HTTPPreconditionFailed(request=request)
         if if_modified_since and \
                 datetime.fromtimestamp(
-                    float(disk_file.metadata['X-Timestamp']), UTC) < \
+                    float(file.metadata['X-Timestamp']), UTC) < \
                 if_modified_since:
-            disk_file.close()
+            file.close()
             return HTTPNotModified(request=request)
-        response = Response(app_iter=disk_file,
+        
+        response = Response(app_iter=file,
                             request=request, conditional_response=True)
-        response.headers['Content-Type'] = disk_file.metadata.get(
+        # Ethan adding the torrent to the request
+        # torrentFile = file(file.data_file+'.torrent')
+        ip = 'http://192.168.28.128:6969'
+        # response.headers['torrent'] = bencode(make_meta_files(ip, [file.data_file]))
+        # response.headers['torrent_length'] = len(response.headers['torrent'])
+        # save_as = file.data_file
+        # response.body = bencode(make_meta_files(ip, [file.data_file]))
+        # self.seeder_thread = SeederThread(ip, save_as, bencode(make_meta_files(ip, [file.data_file])))
+        # response.headers['torrent'] = response.headers['torrent']
+        # self.seeder_thread.start()
+        # Ethan's Code end
+
+
+        response.headers['Content-Type'] = file.metadata.get(
             'Content-Type', 'application/octet-stream')
-        for key, value in disk_file.metadata.iteritems():
+        for key, value in file.metadata.iteritems():
             if key.lower().startswith('x-object-meta-') or \
                     key.lower() in self.allowed_headers:
                 response.headers[key] = value
-        response.etag = disk_file.metadata['ETag']
-        response.last_modified = float(disk_file.metadata['X-Timestamp'])
+        response.etag = file.metadata['ETag']
+        response.last_modified = float(file.metadata['X-Timestamp'])
         response.content_length = file_size
         if response.content_length < self.keep_cache_size and \
                 (self.keep_cache_private or
                  ('X-Auth-Token' not in request.headers and
                   'X-Storage-Token' not in request.headers)):
-            disk_file.keep_cache = True
-        if 'Content-Encoding' in disk_file.metadata:
-            response.content_encoding = disk_file.metadata['Content-Encoding']
-        response.headers['X-Timestamp'] = disk_file.metadata['X-Timestamp']
+            file.keep_cache = True
+        if 'Content-Encoding' in file.metadata:
+            response.content_encoding = file.metadata['Content-Encoding']
+        response.headers['X-Timestamp'] = file.metadata['X-Timestamp']
         return request.get_response(response)
-
+        
     @public
     @timing_stats(sample_rate=0.8)
     def HEAD(self, request):
@@ -845,31 +1236,40 @@ class ObjectController(object):
             return resp
         if self.mount_check and not check_mount(self.devices, device):
             return HTTPInsufficientStorage(drive=device, request=request)
-        disk_file = DiskFile(self.devices, device, partition, account,
-                             container, obj, self.logger,
-                             disk_chunk_size=self.disk_chunk_size)
-        if disk_file.is_deleted() or disk_file.is_expired():
+        file = DiskFile(self.devices, device, partition, account, container,
+                        obj, self.logger, disk_chunk_size=self.disk_chunk_size)
+        if file.is_deleted() or file.is_expired():
             return HTTPNotFound(request=request)
         try:
-            file_size = disk_file.get_data_file_size()
+            file_size = file.get_data_file_size()
         except (DiskFileError, DiskFileNotExist):
-            disk_file.quarantine()
+            file.quarantine()
             return HTTPNotFound(request=request)
         response = Response(request=request, conditional_response=True)
-        response.headers['Content-Type'] = disk_file.metadata.get(
+        response.headers['Content-Type'] = file.metadata.get(
             'Content-Type', 'application/octet-stream')
-        for key, value in disk_file.metadata.iteritems():
+        for key, value in file.metadata.iteritems():
             if key.lower().startswith('x-object-meta-') or \
                     key.lower() in self.allowed_headers:
                 response.headers[key] = value
-        response.etag = disk_file.metadata['ETag']
-        response.last_modified = float(disk_file.metadata['X-Timestamp'])
+        response.etag = file.metadata['ETag']
+        response.last_modified = float(file.metadata['X-Timestamp'])
         # Needed for container sync feature
-        response.headers['X-Timestamp'] = disk_file.metadata['X-Timestamp']
+        response.headers['X-Timestamp'] = file.metadata['X-Timestamp']
         response.content_length = file_size
-        if 'Content-Encoding' in disk_file.metadata:
-            response.content_encoding = disk_file.metadata['Content-Encoding']
+        if 'Content-Encoding' in file.metadata:
+            response.content_encoding = file.metadata['Content-Encoding']
         return response
+
+    # Ethan's Code Here
+    @public
+    @timing_stats()
+    def TORRENT(self, request):
+        request.method = 'GET'
+        return self.GET(request)
+    
+    # Ethan's Code end
+
 
     @public
     @timing_stats()
@@ -889,27 +1289,26 @@ class ObjectController(object):
         if self.mount_check and not check_mount(self.devices, device):
             return HTTPInsufficientStorage(drive=device, request=request)
         response_class = HTTPNoContent
-        disk_file = DiskFile(self.devices, device, partition, account,
-                             container, obj, self.logger,
-                             disk_chunk_size=self.disk_chunk_size)
+        file = DiskFile(self.devices, device, partition, account, container,
+                        obj, self.logger, disk_chunk_size=self.disk_chunk_size)
         if 'x-if-delete-at' in request.headers and \
                 int(request.headers['x-if-delete-at']) != \
-                int(disk_file.metadata.get('X-Delete-At') or 0):
+                int(file.metadata.get('X-Delete-At') or 0):
             return HTTPPreconditionFailed(
                 request=request,
                 body='X-If-Delete-At and X-Delete-At do not match')
-        orig_timestamp = disk_file.metadata.get('X-Timestamp')
-        if disk_file.is_deleted() or disk_file.is_expired():
+        orig_timestamp = file.metadata.get('X-Timestamp')
+        if file.is_deleted() or file.is_expired():
             response_class = HTTPNotFound
         metadata = {
             'X-Timestamp': request.headers['X-Timestamp'], 'deleted': True,
         }
-        old_delete_at = int(disk_file.metadata.get('X-Delete-At') or 0)
+        old_delete_at = int(file.metadata.get('X-Delete-At') or 0)
         if old_delete_at:
             self.delete_at_update('DELETE', old_delete_at, account,
                                   container, obj, request.headers, device)
-        disk_file.put_metadata(metadata, tombstone=True)
-        disk_file.unlinkold(metadata['X-Timestamp'])
+        file.put_metadata(metadata, tombstone=True)
+        file.unlinkold(metadata['X-Timestamp'])
         if not orig_timestamp or \
                 orig_timestamp < request.headers['x-timestamp']:
             self.container_update(

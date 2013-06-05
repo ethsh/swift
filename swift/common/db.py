@@ -1064,7 +1064,6 @@ class ContainerBroker(DatabaseBroker):
         :returns: list of tuples of (name, created_at, size, content_type,
                   etag)
         """
-        delim_force_gte = False
         (marker, end_marker, prefix, delimiter, path) = utf8encode(
             marker, end_marker, prefix, delimiter, path)
         try:
@@ -1089,12 +1088,7 @@ class ContainerBroker(DatabaseBroker):
                 if end_marker:
                     query += ' name < ? AND'
                     query_args.append(end_marker)
-                if delim_force_gte:
-                    query += ' name >= ? AND'
-                    query_args.append(marker)
-                    # Always set back to False
-                    delim_force_gte = False
-                elif marker and marker >= prefix:
+                if marker and marker >= prefix:
                     query += ' name > ? AND'
                     query_args.append(marker)
                 elif prefix:
@@ -1130,8 +1124,6 @@ class ContainerBroker(DatabaseBroker):
                             break
                     elif end > 0:
                         marker = name[:end] + chr(ord(delimiter) + 1)
-                        # we want result to be inclusinve of delim+1
-                        delim_force_gte = True
                         dir_name = name[:end + 1]
                         if dir_name != orig_marker:
                             results.append([dir_name, '0', 0, None, ''])

@@ -21,7 +21,7 @@ import sys
 import unittest
 import urlparse
 import signal
-from contextlib import contextmanager, nested
+from contextlib import contextmanager
 from gzip import GzipFile
 from shutil import rmtree
 import time
@@ -30,7 +30,6 @@ from hashlib import md5
 from tempfile import mkdtemp
 import random
 
-import mock
 from eventlet import sleep, spawn, wsgi, listen
 import simplejson
 
@@ -205,13 +204,6 @@ class FakeRing(object):
         self.replicas = replicas
         self.devs = {}
 
-    @property
-    def replica_count(self):
-        return self.replicas
-
-    def get_part(self, account, container=None, obj=None):
-        return 1
-
     def get_nodes(self, account, container=None, obj=None):
         devs = []
         for x in xrange(self.replicas):
@@ -315,17 +307,6 @@ class TestController(unittest.TestCase):
         self.container = 'some_container'
         self.read_acl = 'read_acl'
         self.write_acl = 'write_acl'
-
-    def test_transfer_headers(self):
-        src_headers = {'x-remove-base-meta-owner': 'x',
-                       'x-base-meta-size': '151M',
-                       'new-owner': 'Kun'}
-        dst_headers = {'x-base-meta-owner': 'Gareth',
-                       'x-base-meta-size': '150M'}
-        self.controller.transfer_headers(src_headers, dst_headers)
-        expected_headers = {'x-base-meta-owner': '',
-                            'x-base-meta-size': '151M'}
-        self.assertEquals(dst_headers, expected_headers)
 
     def check_account_info_return(self, partition, nodes, is_none=False):
         if is_none:
@@ -438,16 +419,14 @@ class TestController(unittest.TestCase):
     def test_account_info_account_autocreate(self):
         with save_globals():
             self.memcache.store = {}
-            # account_info returns after 3 non 2xx responses unless autocreate
-            # is True
-            set_http_connect(404, 404, 404)
+            set_http_connect(404, 404, 404, 201, 201, 201)
             partition, nodes, count = \
                 self.controller.account_info(self.account, autocreate=False)
             self.check_account_info_return(partition, nodes, is_none=True)
             self.assertEquals(count, None)
 
             self.memcache.store = {}
-            set_http_connect(404, 404, 404)
+            set_http_connect(404, 404, 404, 201, 201, 201)
             partition, nodes, count = \
                 self.controller.account_info(self.account)
             self.check_account_info_return(partition, nodes, is_none=True)
@@ -1042,8 +1021,8 @@ class TestObjectController(unittest.TestCase):
                 200,    # GET listing1
                 200,    # GET seg01
                 200,    # GET seg02
-                headers=[{}, {}, {"X-Static-Large-Object": "True",
-                         'content-type': 'text/html; swift_bytes=4'}, {}, {}],
+                headers={"X-Static-Large-Object": "True",
+                         'content-type': 'text/html; swift_bytes=4'},
                 body_iter=response_bodies,
                 give_connect=capture_requested_paths)
 
@@ -1197,64 +1176,8 @@ class TestObjectController(unittest.TestCase):
                 200,    # GET listing1
                 200,    # GET seg01
                 200,    # GET seg02
-                headers=[{}, {}, {"X-Static-Large-Object": "True",
-                         'content-type': 'text/html; swift_bytes=4'}, {}, {}],
-                body_iter=response_bodies,
-                give_connect=capture_requested_paths)
-            req = Request.blank('/a/c/manifest')
-            resp = controller.GET(req)
-            self.assertEqual(resp.status_int, 200)
-            self.assertEqual(resp.body, 'Aa')  # dropped connection
-            self.assertEqual(resp.content_length, 4)  # content incomplete
-            self.assertEqual(resp.content_type, 'text/html')
-
-            self.assertEqual(
-                requested,
-                [['HEAD', '/a', {}],
-                 ['HEAD', '/a/c', {}],
-                 ['GET', '/a/c/manifest', {}],
-                 ['GET', '/a/d1/seg01', {}],
-                 ['GET', '/a/d2/seg02', {}]])
-
-    def test_GET_nested_slo(self):
-        listing = [{"hash": "98568d540134639be4655198a36614a4",
-                    "last_modified": "2012-11-08T04:05:37.866820",
-                    "bytes": 2,
-                    "name": "/d1/seg01",
-                    "content_type": "application/octet-stream"},
-                   {"hash": "d526f1c8ef6c1e4e980e2b8471352d23",
-                    "last_modified": "2012-11-08T04:05:37.846710",
-                    "bytes": 2,
-                    "name": "/d2/seg02",
-                    "content_type": "application/octet-stream"}]
-
-        response_bodies = (
-            '',                           # HEAD /a
-            '',                           # HEAD /a/c
-            simplejson.dumps(listing),    # GET manifest
-            'Aa',                         # GET seg01
-            'Bb')                         # GET seg02
-        with save_globals():
-            controller = proxy_server.ObjectController(
-                self.app, 'a', 'c', 'manifest')
-
-            requested = []
-
-            def capture_requested_paths(ipaddr, port, device, partition,
-                                        method, path, headers=None,
-                                        query_string=None):
-                qs_dict = dict(urlparse.parse_qsl(query_string or ''))
-                requested.append([method, path, qs_dict])
-
-            slob_headers = {"X-Static-Large-Object": "True",
-                            'content-type': 'text/html; swift_bytes=4'}
-            set_http_connect(
-                200,    # HEAD /a
-                200,    # HEAD /a/c
-                200,    # GET listing1
-                200,    # GET seg01
-                200,    # GET seg02
-                headers=[{}, {}, slob_headers, {}, slob_headers],
+                headers={"X-Static-Large-Object": "True",
+                         'content-type': 'text/html; swift_bytes=4'},
                 body_iter=response_bodies,
                 give_connect=capture_requested_paths)
             req = Request.blank('/a/c/manifest')
@@ -1313,8 +1236,8 @@ class TestObjectController(unittest.TestCase):
                 200,    # GET listing1
                 200,    # GET seg01
                 404,    # GET seg02
-                headers=[{}, {}, {"X-Static-Large-Object": "True",
-                         'content-type': 'text/html; swift_bytes=4'}, {}, {}],
+                headers={"X-Static-Large-Object": "True",
+                         'content-type': 'text/html; swift_bytes=4'},
                 body_iter=response_bodies,
                 give_connect=capture_requested_paths)
             req = Request.blank('/a/c/manifest')
@@ -1999,13 +1922,12 @@ class TestObjectController(unittest.TestCase):
                                                                   'container',
                                                                   'object')
                 collected_nodes = []
-                for node in controller.iter_nodes(self.app.object_ring,
-                                                  partition):
+                for node in controller.iter_nodes(partition, nodes,
+                                                  self.app.object_ring):
                     collected_nodes.append(node)
                 self.assertEquals(len(collected_nodes), 5)
 
                 self.app.object_ring.max_more_nodes = 20
-                self.app.request_node_count = lambda r: 20
                 controller = proxy_server.ObjectController(self.app, 'account',
                                                            'container',
                                                            'object')
@@ -2013,8 +1935,8 @@ class TestObjectController(unittest.TestCase):
                                                                   'container',
                                                                   'object')
                 collected_nodes = []
-                for node in controller.iter_nodes(self.app.object_ring,
-                                                  partition):
+                for node in controller.iter_nodes(partition, nodes,
+                                                  self.app.object_ring):
                     collected_nodes.append(node)
                 self.assertEquals(len(collected_nodes), 9)
 
@@ -2028,8 +1950,8 @@ class TestObjectController(unittest.TestCase):
                                                                   'container',
                                                                   'object')
                 collected_nodes = []
-                for node in controller.iter_nodes(self.app.object_ring,
-                                                  partition):
+                for node in controller.iter_nodes(partition, nodes,
+                                                  self.app.object_ring):
                     collected_nodes.append(node)
                 self.assertEquals(len(collected_nodes), 5)
                 self.assertEquals(
@@ -2047,48 +1969,13 @@ class TestObjectController(unittest.TestCase):
                                                                   'container',
                                                                   'object')
                 collected_nodes = []
-                for node in controller.iter_nodes(self.app.object_ring,
-                                                  partition):
+                for node in controller.iter_nodes(partition, nodes,
+                                                  self.app.object_ring):
                     collected_nodes.append(node)
                 self.assertEquals(len(collected_nodes), 5)
                 self.assertEquals(self.app.logger.log_dict['warning'], [])
             finally:
                 self.app.object_ring.max_more_nodes = 0
-
-    def test_iter_nodes_calls_sort_nodes(self):
-        with mock.patch.object(self.app, 'sort_nodes') as sort_nodes:
-            controller = proxy_server.ObjectController(self.app, 'a', 'c', 'o')
-            for node in controller.iter_nodes(self.app.object_ring, 0):
-                pass
-            sort_nodes.assert_called_once_with(
-                self.app.object_ring.get_part_nodes(0))
-
-    def test_iter_nodes_skips_error_limited(self):
-        with mock.patch.object(self.app, 'sort_nodes', lambda n: n):
-            controller = proxy_server.ObjectController(self.app, 'a', 'c', 'o')
-            first_nodes = list(controller.iter_nodes(self.app.object_ring, 0))
-            second_nodes = list(controller.iter_nodes(self.app.object_ring, 0))
-            self.assertTrue(first_nodes[0] in second_nodes)
-
-            controller.error_limit(first_nodes[0], 'test')
-            second_nodes = list(controller.iter_nodes(self.app.object_ring, 0))
-            self.assertTrue(first_nodes[0] not in second_nodes)
-
-    def test_iter_nodes_gives_extra_if_error_limited_inline(self):
-        with nested(
-                mock.patch.object(self.app, 'sort_nodes', lambda n: n),
-                mock.patch.object(self.app, 'request_node_count',
-                                  lambda r: 6),
-                mock.patch.object(self.app.object_ring, 'max_more_nodes', 99)):
-            controller = proxy_server.ObjectController(self.app, 'a', 'c', 'o')
-            first_nodes = list(controller.iter_nodes(self.app.object_ring, 0))
-            second_nodes = []
-            for node in controller.iter_nodes(self.app.object_ring, 0):
-                if not second_nodes:
-                    controller.error_limit(node, 'test')
-                second_nodes.append(node)
-            self.assertEquals(len(first_nodes), 6)
-            self.assertEquals(len(second_nodes), 7)
 
     def test_best_response_sets_etag(self):
         controller = proxy_server.ObjectController(self.app, 'account',
@@ -2512,7 +2399,6 @@ class TestObjectController(unittest.TestCase):
             self.assertEquals(resp.headers.get('x-object-meta-test'),
                               'testing')
             self.assertEquals(resp.headers.get('x-object-meta-ours'), 'okay')
-            self.assertEquals(resp.headers.get('x-delete-at'), '9876543210')
 
             # copy-from object is too large to fit in target object
             req = Request.blank('/a/c/o', environ={'REQUEST_METHOD': 'PUT'},
@@ -2644,7 +2530,6 @@ class TestObjectController(unittest.TestCase):
             self.assertEquals(resp.headers.get('x-object-meta-test'),
                               'testing')
             self.assertEquals(resp.headers.get('x-object-meta-ours'), 'okay')
-            self.assertEquals(resp.headers.get('x-delete-at'), '9876543210')
 
             req = Request.blank('/a/c/o', environ={'REQUEST_METHOD': 'COPY'},
                                 headers={'Destination': '/c/o'})
@@ -2681,29 +2566,6 @@ class TestObjectController(unittest.TestCase):
             self.assertEquals(resp.status_int, 201)
             self.assertEquals(resp.headers['x-copied-from-last-modified'],
                               '3')
-
-    def test_COPY_delete_at(self):
-        with save_globals():
-            given_headers = {}
-
-            def fake_connect_put_node(nodes, part, path, headers,
-                                      logger_thread_locals):
-                given_headers.update(headers)
-
-            controller = proxy_server.ObjectController(self.app, 'a',
-                                                       'c', 'o')
-            controller._connect_put_node = fake_connect_put_node
-            set_http_connect(200, 200, 200, 200, 200, 201, 201, 201)
-            self.app.memcache.store = {}
-            req = Request.blank('/a/c/o', environ={'REQUEST_METHOD': 'COPY'},
-                                headers={'Destination': '/c/o'})
-
-            self.app.update_request(req)
-            controller.COPY(req)
-            self.assertEquals(given_headers.get('X-Delete-At'), '9876543210')
-            self.assertTrue('X-Delete-At-Host' in given_headers)
-            self.assertTrue('X-Delete-At-Device' in given_headers)
-            self.assertTrue('X-Delete-At-Partition' in given_headers)
 
     def test_chunked_put(self):
 
@@ -4147,6 +4009,7 @@ class TestObjectController(unittest.TestCase):
                 return {
                     'cors': {
                         'allow_origin': 'http://foo.bar:8080 https://foo.bar',
+                        'allow_headers': 'x-foo',
                         'max_age': '999',
                     }
                 }
@@ -4169,6 +4032,9 @@ class TestObjectController(unittest.TestCase):
                 len(resp.headers['access-control-allow-methods'].split(', ')),
                 7)
             self.assertEquals('999', resp.headers['access-control-max-age'])
+            self.assertEquals(
+                'x-auth-token, x-foo',
+                sortHeaderNames(resp.headers['access-control-allow-headers']))
             req = Request.blank(
                 '/a/c/o.jpg',
                 {'REQUEST_METHOD': 'OPTIONS'},
@@ -4203,6 +4069,7 @@ class TestObjectController(unittest.TestCase):
                 return {
                     'cors': {
                         'allow_origin': '*',
+                        'allow_headers': 'x-foo',
                         'max_age': '999',
                     }
                 }
@@ -4225,6 +4092,9 @@ class TestObjectController(unittest.TestCase):
                 len(resp.headers['access-control-allow-methods'].split(', ')),
                 7)
             self.assertEquals('999', resp.headers['access-control-max-age'])
+            self.assertEquals(
+                'x-auth-token, x-foo',
+                sortHeaderNames(resp.headers['access-control-allow-headers']))
 
     def test_CORS_valid(self):
         with save_globals():
@@ -4458,17 +4328,6 @@ class TestContainerController(unittest.TestCase):
                                             container_ring=FakeRing(),
                                             object_ring=FakeRing())
 
-    def test_transfer_headers(self):
-        src_headers = {'x-remove-versions-location': 'x',
-                       'x-container-read': '*:user'}
-        dst_headers = {'x-versions-location': 'backup'}
-        controller = swift.proxy.controllers.ContainerController(self.app,
-                                                                 'a', 'c')
-        controller.transfer_headers(src_headers, dst_headers)
-        expected_headers = {'x-versions-location': '',
-                            'x-container-read': '*:user'}
-        self.assertEqual(dst_headers, expected_headers)
-
     def assert_status_map(self, method, statuses, expected,
                           raise_exc=False, missing_container=False):
         with save_globals():
@@ -4491,7 +4350,7 @@ class TestContainerController(unittest.TestCase):
             res = method(req)
             self.assertEquals(res.status_int, expected)
 
-    def test_HEAD_GET(self):
+    def test_HEAD(self):
         with save_globals():
             controller = proxy_server.ContainerController(self.app, 'account',
                                                           'container')
@@ -4507,29 +4366,14 @@ class TestContainerController(unittest.TestCase):
                 if expected < 400:
                     self.assert_('x-works' in res.headers)
                     self.assertEquals(res.headers['x-works'], 'yes')
-
-                set_http_connect(*statuses, **kwargs)
-                self.app.memcache.store = {}
-                req = Request.blank('/a/c', {})
-                self.app.update_request(req)
-                res = controller.GET(req)
-                self.assertEquals(res.status[:len(str(expected))],
-                                  str(expected))
-                if expected < 400:
-                    self.assert_('x-works' in res.headers)
-                    self.assertEquals(res.headers['x-works'], 'yes')
             test_status_map((200, 200, 404, 404), 200)
             test_status_map((200, 200, 500, 404), 200)
             test_status_map((200, 304, 500, 404), 304)
             test_status_map((200, 404, 404, 404), 404)
             test_status_map((200, 404, 404, 500), 404)
             test_status_map((200, 500, 500, 500), 503)
-            self.assertFalse(self.app.account_autocreate)
-            test_status_map((404, 404, 404), 404)
-            self.app.account_autocreate = True
-            test_status_map((404, 404, 404), 404)
 
-    def test_PUT_POST(self):
+    def test_PUT(self):
         with save_globals():
             controller = proxy_server.ContainerController(self.app, 'account',
                                                           'container')
@@ -4543,28 +4387,10 @@ class TestContainerController(unittest.TestCase):
                 res = controller.PUT(req)
                 expected = str(expected)
                 self.assertEquals(res.status[:len(expected)], expected)
-
-                set_http_connect(*statuses, **kwargs)
-                self.app.memcache.store = {}
-                req = Request.blank('/a/c', {})
-                req.content_length = 0
-                self.app.update_request(req)
-                res = controller.POST(req)
-                expected = str(expected)
-                self.assertEquals(res.status[:len(expected)], expected)
             test_status_map((200, 201, 201, 201), 201, missing_container=True)
             test_status_map((200, 201, 201, 500), 201, missing_container=True)
             test_status_map((200, 204, 404, 404), 404, missing_container=True)
             test_status_map((200, 204, 500, 404), 503, missing_container=True)
-            self.assertFalse(self.app.account_autocreate)
-            test_status_map((404, 404, 404), 404, missing_container=True)
-            self.app.account_autocreate = True
-            test_status_map((404, 404, 404, 201, 201, 201, 200, 200, 200), 200,
-                            missing_container=True)
-            test_status_map((404, 404, 404, 403, 403, 403), 404,
-                            missing_container=True)
-            test_status_map((404, 404, 404, 403, 201, 201, 403, 201, 201), 201,
-                            missing_container=True)
 
     def test_PUT_max_containers_per_account(self):
         with save_globals():
@@ -4721,12 +4547,6 @@ class TestContainerController(unittest.TestCase):
                                    (200, 404, 404, 404), 404)
             self.assert_status_map(controller.DELETE,
                                    (200, 204, 503, 404), 503)
-            self.assertFalse(self.app.account_autocreate)
-            self.assert_status_map(controller.DELETE,
-                                   (404, 404, 404), 404)
-            self.app.account_autocreate = True
-            self.assert_status_map(controller.DELETE,
-                                   (404, 404, 404), 404)
 
             self.app.memcache = FakeMemcacheReturnsNone()
             # 200: Account check, 404x3: Container check
@@ -5017,6 +4837,7 @@ class TestContainerController(unittest.TestCase):
                 return {
                     'cors': {
                         'allow_origin': 'http://foo.bar:8080 https://foo.bar',
+                        'allow_headers': 'x-foo',
                         'max_age': '999',
                     }
                 }
@@ -5039,6 +4860,9 @@ class TestContainerController(unittest.TestCase):
                 len(resp.headers['access-control-allow-methods'].split(', ')),
                 6)
             self.assertEquals('999', resp.headers['access-control-max-age'])
+            self.assertEquals(
+                'x-auth-token, x-foo',
+                sortHeaderNames(resp.headers['access-control-allow-headers']))
             req = Request.blank(
                 '/a/c',
                 {'REQUEST_METHOD': 'OPTIONS'},
@@ -5074,6 +4898,7 @@ class TestContainerController(unittest.TestCase):
                 return {
                     'cors': {
                         'allow_origin': '*',
+                        'allow_headers': 'x-foo',
                         'max_age': '999',
                     }
                 }
@@ -5096,20 +4921,8 @@ class TestContainerController(unittest.TestCase):
                 len(resp.headers['access-control-allow-methods'].split(', ')),
                 6)
             self.assertEquals('999', resp.headers['access-control-max-age'])
-
-            req = Request.blank(
-                '/a/c/o.jpg',
-                {'REQUEST_METHOD': 'OPTIONS'},
-                headers={'Origin': 'https://bar.baz',
-                         'Access-Control-Request-Headers':
-                         'x-foo, x-bar, x-auth-token',
-                         'Access-Control-Request-Method': 'GET'}
-            )
-            req.content_length = 0
-            resp = controller.OPTIONS(req)
-            self.assertEquals(200, resp.status_int)
             self.assertEquals(
-                sortHeaderNames('x-foo, x-bar, x-auth-token'),
+                'x-auth-token, x-foo',
                 sortHeaderNames(resp.headers['access-control-allow-headers']))
 
     def test_CORS_valid(self):
@@ -5320,21 +5133,20 @@ class TestAccountController(unittest.TestCase):
     def test_GET(self):
         with save_globals():
             controller = proxy_server.AccountController(self.app, 'account')
-            # GET returns after the first successful call to an Account Server
-            self.assert_status_map(controller.GET, (200,), 200)
-            self.assert_status_map(controller.GET, (503, 200), 200)
-            self.assert_status_map(controller.GET, (503, 503, 200), 200)
-            self.assert_status_map(controller.GET, (204,), 204)
-            self.assert_status_map(controller.GET, (503, 204), 204)
-            self.assert_status_map(controller.GET, (503, 503, 204), 204)
-            self.assert_status_map(controller.GET, (404, 200), 200)
-            self.assert_status_map(controller.GET, (404, 404, 200), 200)
-            self.assert_status_map(controller.GET, (404, 503, 204), 204)
-            # If Account servers fail, if autocreate = False, return majority
-            # response
+            self.assert_status_map(controller.GET, (200, 200, 200), 200)
+            self.assert_status_map(controller.GET, (200, 200, 503), 200)
+            self.assert_status_map(controller.GET, (200, 503, 503), 200)
+            self.assert_status_map(controller.GET, (204, 204, 204), 204)
+            self.assert_status_map(controller.GET, (204, 204, 503), 204)
+            self.assert_status_map(controller.GET, (204, 503, 503), 204)
+            self.assert_status_map(controller.GET, (204, 204, 200), 204)
+            self.assert_status_map(controller.GET, (204, 200, 200), 204)
             self.assert_status_map(controller.GET, (404, 404, 404), 404)
+            self.assert_status_map(controller.GET, (404, 404, 200), 200)
+            self.assert_status_map(controller.GET, (404, 200, 200), 200)
             self.assert_status_map(controller.GET, (404, 404, 503), 404)
             self.assert_status_map(controller.GET, (404, 503, 503), 503)
+            self.assert_status_map(controller.GET, (404, 204, 503), 204)
 
             self.app.memcache = FakeMemcacheReturnsNone()
             self.assert_status_map(controller.GET, (404, 404, 404), 404)
@@ -5343,49 +5155,35 @@ class TestAccountController(unittest.TestCase):
         with save_globals():
             controller = proxy_server.AccountController(self.app, 'account')
             self.app.memcache = FakeMemcacheReturnsNone()
-            # Repeat the test for autocreate = False and 404 by all
             self.assert_status_map(controller.GET,
                                    (404, 404, 404, 201, 201, 201, 204), 404)
-            self.assert_status_map(controller.GET,
-                                   (404, 503, 404, 201, 201, 201, 204), 404)
-            # When autocreate is True, if none of the nodes respond 2xx
-            # And quorum of the nodes responded 404,
-            # ALL nodes are asked to create the account
-            # If successful, the GET request is repeated.
             controller.app.account_autocreate = True
             self.assert_status_map(controller.GET,
                                    (404, 404, 404, 201, 201, 201, 204), 204)
             self.assert_status_map(controller.GET,
-                                   (404, 503, 404, 201, 503, 201, 204), 204)
-            # Test a case when less than quorum responded 2xx during
-            # account create
+                                   (404, 404, 404, 403, 403, 403, 403), 403)
             self.assert_status_map(controller.GET,
-                                   (404, 404, 404, 201, 409, 409), 409)
-            self.assert_status_map(controller.GET,
-                                   (404, 404, 404, 403, 403, 403), 403)
-            self.assert_status_map(controller.GET,
-                                   (404, 503, 404, 403, 503, 403), 403)
+                                   (404, 404, 404, 409, 409, 409, 409), 409)
 
     def test_HEAD(self):
-        # Same behaviour as GET
         with save_globals():
             controller = proxy_server.AccountController(self.app, 'account')
-            self.assert_status_map(controller.HEAD, (200,), 200)
-            self.assert_status_map(controller.HEAD, (503, 200), 200)
-            self.assert_status_map(controller.HEAD, (503, 503, 200), 200)
-            self.assert_status_map(controller.HEAD, (204,), 204)
-            self.assert_status_map(controller.HEAD, (503, 204), 204)
+            self.assert_status_map(controller.HEAD, (200, 200, 200), 200)
+            self.assert_status_map(controller.HEAD, (200, 200, 503), 200)
+            self.assert_status_map(controller.HEAD, (200, 503, 503), 200)
+            self.assert_status_map(controller.HEAD, (204, 204, 204), 204)
+            self.assert_status_map(controller.HEAD, (204, 204, 503), 204)
             self.assert_status_map(controller.HEAD, (204, 503, 503), 204)
-            self.assert_status_map(controller.HEAD, (204,), 204)
+            self.assert_status_map(controller.HEAD, (204, 204, 200), 204)
+            self.assert_status_map(controller.HEAD, (204, 200, 200), 204)
             self.assert_status_map(controller.HEAD, (404, 404, 404), 404)
             self.assert_status_map(controller.HEAD, (404, 404, 200), 200)
-            self.assert_status_map(controller.HEAD, (404, 200), 200)
+            self.assert_status_map(controller.HEAD, (404, 200, 200), 200)
             self.assert_status_map(controller.HEAD, (404, 404, 503), 404)
             self.assert_status_map(controller.HEAD, (404, 503, 503), 503)
-            self.assert_status_map(controller.HEAD, (404, 503, 204), 204)
+            self.assert_status_map(controller.HEAD, (404, 204, 503), 204)
 
     def test_HEAD_autocreate(self):
-        # Same behaviour as GET
         with save_globals():
             controller = proxy_server.AccountController(self.app, 'account')
             self.app.memcache = FakeMemcacheReturnsNone()
@@ -5395,9 +5193,9 @@ class TestAccountController(unittest.TestCase):
             self.assert_status_map(controller.HEAD,
                                    (404, 404, 404, 201, 201, 201, 204), 204)
             self.assert_status_map(controller.HEAD,
-                                   (404, 404, 404, 201, 409, 409), 409)
+                                   (404, 404, 404, 403, 403, 403, 403), 403)
             self.assert_status_map(controller.HEAD,
-                                   (404, 404, 404, 201, 403, 201, 204), 204)
+                                   (404, 404, 404, 409, 409, 409, 409), 409)
 
     def test_POST_autocreate(self):
         with save_globals():
@@ -5409,13 +5207,9 @@ class TestAccountController(unittest.TestCase):
             self.assert_status_map(controller.POST,
                                    (404, 404, 404, 201, 201, 201), 201)
             self.assert_status_map(controller.POST,
-                                   (404, 404, 404, 403, 403, 403), 403)
+                                   (404, 404, 404, 403, 403, 403, 403), 403)
             self.assert_status_map(controller.POST,
-                                   (404, 404, 404, 409, 409, 409), 409)
-            self.assert_status_map(controller.POST,
-                                   (404, 404, 404, 201, 409, 409), 409)
-            self.assert_status_map(controller.POST,
-                                   (404, 404, 404, 201, 201, 409), 201)
+                                   (404, 404, 404, 409, 409, 409, 409), 409)
 
     def test_connection_refused(self):
         self.app.account_ring.get_nodes('account')
@@ -5649,29 +5443,6 @@ class TestAccountController(unittest.TestCase):
             test_status_map((201, 500, 500), 503)
             test_status_map((204, 500, 404), 503)
 
-    def test_DELETE_with_query_string(self):
-        # Extra safety in case someone typos a query string for an
-        # account-level DELETE request that was really meant to be caught by
-        # some middleware.
-        with save_globals():
-            controller = proxy_server.AccountController(self.app, 'account')
-
-            def test_status_map(statuses, expected, **kwargs):
-                set_http_connect(*statuses, **kwargs)
-                self.app.memcache.store = {}
-                req = Request.blank('/a?whoops', {'REQUEST_METHOD': 'DELETE'})
-                req.content_length = 0
-                self.app.update_request(req)
-                res = controller.DELETE(req)
-                expected = str(expected)
-                self.assertEquals(res.status[:len(expected)], expected)
-            test_status_map((201, 201, 201), 400)
-            self.app.allow_account_management = True
-            test_status_map((201, 201, 201), 400)
-            test_status_map((201, 201, 500), 400)
-            test_status_map((201, 500, 500), 400)
-            test_status_map((204, 500, 404), 400)
-
 
 class FakeObjectController(object):
 
@@ -5704,8 +5475,8 @@ class FakeObjectController(object):
         resp = Response(app_iter=iter(body))
         return resp
 
-    def iter_nodes(self, ring, partition):
-        for node in ring.get_part_nodes(partition):
+    def iter_nodes(self, partition, nodes, ring):
+        for node in nodes:
             yield node
         for node in ring.get_more_nodes(partition):
             yield node

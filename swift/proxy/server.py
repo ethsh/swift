@@ -27,6 +27,7 @@
 import mimetypes
 import os
 from ConfigParser import ConfigParser
+import uuid
 from random import shuffle
 from time import time
 
@@ -34,14 +35,32 @@ from eventlet import Timeout
 
 from swift.common.ring import Ring
 from swift.common.utils import cache_from_env, get_logger, \
-    get_remote_client, split_path, config_true_value, generate_trans_id
+    get_remote_client, split_path, config_true_value
 from swift.common.constraints import check_utf8
 from swift.proxy.controllers import AccountController, ObjectController, \
     ContainerController
 from swift.common.swob import HTTPBadRequest, HTTPForbidden, \
     HTTPMethodNotAllowed, HTTPNotFound, HTTPPreconditionFailed, \
     HTTPServerError, Request
+    
+# Ethan's Code
+# import resource
+# resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+#Note: BitTorrent hijacks our stderr, reclaim it
+import threading
+from BitTorrent import reset_stderr
+reset_stderr()
+from BitTorrent.track import track
 
+class TrackerThread (threading.Thread):
+    def __init__(self, port, dstate):
+        threading.Thread.__init__(self)
+        self.port = port
+        self.dfile = dstate
+    def run(self):
+        track(['--port', self.port, '--dfile', self.dfile])
+
+# Ethan's Code End
 
 class Application(object):
     """WSGI application for the proxy server."""
@@ -115,16 +134,16 @@ class Application(object):
         self.sorting_method = conf.get('sorting_method', 'shuffle').lower()
         self.allow_static_large_object = config_true_value(
             conf.get('allow_static_large_object', 'true'))
-        value = conf.get('request_node_count', '2 * replicas').lower().split()
-        if len(value) == 1:
-            value = int(value[0])
-            self.request_node_count = lambda r: value
-        elif len(value) == 3 and value[1] == '*' and value[2] == 'replicas':
-            value = int(value[0])
-            self.request_node_count = lambda r: value * r.replica_count
-        else:
-            raise ValueError(
-                'Invalid request_node_count value: %r' % ''.join(value))
+        
+        # Ethan's code
+        self.torrents_request_suffix = '?torrent'
+        self.tracker_port = '6969';
+        self.dfile = 'dstate';
+        # self.tracker_thread = TrackerThread(self.tracker_port, self.dfile)
+        # self.tracker_thread.start()
+        #track(['--port', self.tracker_port, '--dfile', self.dfile])
+        #Ethan's code end
+        
 
     def get_controller(self, path):
         """
@@ -201,6 +220,13 @@ class Application(object):
                     request=req, body='Invalid UTF8 or contains NULL')
 
             try:
+                # Ethan's code in here
+                isTorrentRequest = req.path_qs.endswith(self.torrents_request_suffix);
+                # if isTorrentRequest:
+                    # req.method = 'TORRENT'
+                    # req.environ['REQUEST_METHOD'] = 'TORRENT'
+                    # req.path = req.path[:-len(self.torrents_request_suffix)]
+                #Ethan's code end
                 controller, path_parts = self.get_controller(req.path)
                 p = req.path_info
                 if isinstance(p, unicode):
@@ -220,7 +246,7 @@ class Application(object):
             controller = controller(self, **path_parts)
             if 'swift.trans_id' not in req.environ:
                 # if this wasn't set by an earlier middleware, set it now
-                trans_id = generate_trans_id(self.trans_id_suffix)
+                trans_id = 'tx' + uuid.uuid4().hex + self.trans_id_suffix
                 req.environ['swift.trans_id'] = trans_id
                 self.logger.txn_id = trans_id
             req.headers['x-trans-id'] = req.environ['swift.trans_id']

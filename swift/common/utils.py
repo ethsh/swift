@@ -21,7 +21,6 @@ import os
 import pwd
 import sys
 import time
-import uuid
 import functools
 from hashlib import md5
 from random import random, shuffle
@@ -177,20 +176,6 @@ def get_param(req, name, default=None):
     if value and not isinstance(value, unicode):
         value.decode('utf8')    # Ensure UTF8ness
     return value
-
-
-def generate_trans_id(trans_id_suffix):
-    return 'tx%s-%010x%s' % (
-        uuid.uuid4().hex[:21], time.time(), trans_id_suffix)
-
-
-def get_trans_id_time(trans_id):
-    if len(trans_id) >= 34 and trans_id[:2] == 'tx' and trans_id[23] == '-':
-        try:
-            return int(trans_id[24:34], 16)
-        except ValueError:
-            pass
-    return None
 
 
 class FallocateWrapper(object):
@@ -941,7 +926,7 @@ def parse_options(parser=None, once=False, test_args=None):
 
     if not args:
         parser.print_usage()
-        print _("Error: missing config path argument")
+        print _("Error: missing config file argument")
         sys.exit(1)
     config = os.path.abspath(args.pop(0))
     if not os.path.exists(config):
@@ -1208,21 +1193,13 @@ def cache_from_env(env):
     return item_from_env(env, 'swift.cache')
 
 
-def read_conf_dir(parser, conf_dir):
-    conf_files = []
-    for f in os.listdir(conf_dir):
-        if f.endswith('.conf') and not f.startswith('.'):
-            conf_files.append(os.path.join(conf_dir, f))
-    return parser.read(sorted(conf_files))
-
-
-def readconf(conf_path, section_name=None, log_name=None, defaults=None,
+def readconf(conffile, section_name=None, log_name=None, defaults=None,
              raw=False):
     """
-    Read config file(s) and return config items as a dict
+    Read config file and return config items as a dict
 
-    :param conf_path: path to config file/directory, or a file-like object
-                     (hasattr readline)
+    :param conffile: path to config file, or a file-like object (hasattr
+                     readline)
     :param section_name: config section to read (will return all sections if
                      not defined)
     :param log_name: name to be used with logging (will use section_name if
@@ -1236,23 +1213,18 @@ def readconf(conf_path, section_name=None, log_name=None, defaults=None,
         c = RawConfigParser(defaults)
     else:
         c = ConfigParser(defaults)
-    if hasattr(conf_path, 'readline'):
-        c.readfp(conf_path)
+    if hasattr(conffile, 'readline'):
+        c.readfp(conffile)
     else:
-        if os.path.isdir(conf_path):
-            # read all configs in directory
-            success = read_conf_dir(c, conf_path)
-        else:
-            success = c.read(conf_path)
-        if not success:
-            print _("Unable to read config from %s") % conf_path
+        if not c.read(conffile):
+            print _("Unable to read config file %s") % conffile
             sys.exit(1)
     if section_name:
         if c.has_section(section_name):
             conf = dict(c.items(section_name))
         else:
             print _("Unable to find %s config section in %s") % \
-                (section_name, conf_path)
+                (section_name, conffile)
             sys.exit(1)
         if "log_name" not in conf:
             if log_name is not None:
@@ -1265,7 +1237,7 @@ def readconf(conf_path, section_name=None, log_name=None, defaults=None,
             conf.update({s: dict(c.items(s))})
         if 'log_name' not in conf:
             conf['log_name'] = log_name
-    conf['__file__'] = conf_path
+    conf['__file__'] = conffile
     return conf
 
 
@@ -1290,44 +1262,27 @@ def write_pickle(obj, dest, tmp=None, pickle_protocol=0):
         renamer(tmppath, dest)
 
 
-def search_tree(root, glob_match, ext='', dir_ext=None):
-    """Look in root, for any files/dirs matching glob, recursively traversing
+def search_tree(root, glob_match, ext):
+    """Look in root, for any files/dirs matching glob, recurively traversing
     any found directories looking for files ending with ext
 
     :param root: start of search path
     :param glob_match: glob to match in root, matching dirs are traversed with
                        os.walk
     :param ext: only files that end in ext will be returned
-    :param dir_ext: if present directories that end with dir_ext will not be
-                    traversed and instead will be returned as a matched path
 
     :returns: list of full paths to matching files, sorted
 
     """
     found_files = []
     for path in glob.glob(os.path.join(root, glob_match)):
-        if os.path.isdir(path):
-            for root, dirs, files in os.walk(path):
-                if dir_ext and root.endswith(dir_ext):
-                    found_files.append(root)
-                    # the root is a config dir, descend no further
-                    break
-                for file_ in files:
-                    if ext and not file_.endswith(ext):
-                        continue
-                    found_files.append(os.path.join(root, file_))
-                found_dir = False
-                for dir_ in dirs:
-                    if dir_ext and dir_.endswith(dir_ext):
-                        found_dir = True
-                        found_files.append(os.path.join(root, dir_))
-                if found_dir:
-                    # do not descend further into matching directories
-                    break
-        else:
-            if ext and not path.endswith(ext):
-                continue
+        if path.endswith(ext):
             found_files.append(path)
+        else:
+            for root, dirs, files in os.walk(path):
+                for file in files:
+                    if file.endswith(ext):
+                        found_files.append(os.path.join(root, file))
     return sorted(found_files)
 
 
