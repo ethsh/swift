@@ -43,6 +43,22 @@ from swift.common.swob import HTTPBadRequest, HTTPForbidden, \
     HTTPMethodNotAllowed, HTTPNotFound, HTTPPreconditionFailed, \
     HTTPServerError, Request
 
+# Ethan's Code
+#Note: BitTorrent hijacks our stderr, reclaim it
+import threading
+from BitTorrent import reset_stderr
+reset_stderr()
+from BitTorrent.track import track
+
+class TrackerThread (threading.Thread):
+    def __init__(self, port, dstate):
+        threading.Thread.__init__(self)
+        self.port = port
+        self.dfile = dstate
+    def run(self):
+        track(['--port', self.port, '--dfile', self.dfile])
+
+# Ethan's Code End
 
 class Application(object):
     """WSGI application for the proxy server."""
@@ -116,6 +132,15 @@ class Application(object):
         self.sorting_method = conf.get('sorting_method', 'shuffle').lower()
         self.allow_static_large_object = config_true_value(
             conf.get('allow_static_large_object', 'true'))
+        
+        # Ethan's code
+        self.torrents_request_suffix = '?torrent'
+        self.tracker_port = '6969';
+        self.dfile = 'dstate';
+        self.tracker_thread = TrackerThread(self.tracker_port, self.dfile)
+        self.tracker_thread.start()
+        #track(['--port', self.tracker_port, '--dfile', self.dfile])
+        #Ethan's code end
 
     def get_controller(self, path):
         """
