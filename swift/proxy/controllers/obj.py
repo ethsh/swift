@@ -526,29 +526,14 @@ class ObjectController(Controller):
     @delay_denial
     def GET(self, req):
         """Handler for HTTP GET requests."""
-        resp = self.GETorHEAD(req)
-        return resp
+        return self.GETorHEAD(req)
 
     @public
     @cors_validation
     @delay_denial
     def HEAD(self, req):
         """Handler for HTTP HEAD requests."""
-        resp = self.GETorHEAD(req)
-        # print 'This is Ethan in HEAD, and this is the path to the file ' +  resp.app_iter.data_file
-        return resp
-    
-    # Ethan's code here
-    def TORRENT(self, req):
-        """Handler for TORRENT requests."""
-        req.method = 'GET'
-        resp = self.GETorHEAD(req)
-        print 'This is Ethan, Went through TORRENT request'
-        # if resp.content_length>0:
-            # resp.app_iter.data_file
-            # pass
-        return resp
-    # Ethan's code end
+        return self.GETorHEAD(req)
 
     @public
     @cors_validation

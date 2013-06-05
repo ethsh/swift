@@ -759,10 +759,7 @@ class Request(object):
             'wsgi.url_scheme': parsed_path.scheme or 'http',
             'wsgi.errors': StringIO(''),
             'wsgi.multithread': False,
-            'wsgi.multiprocess': False,
-            # Ethan's code
-            # 'IS_TORRENT_REQUEST': False
-            # Ethan's code end
+            'wsgi.multiprocess': False
         }
         env.update(environ)
         if body is not None:
