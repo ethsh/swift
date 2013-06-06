@@ -801,8 +801,8 @@ class ObjectController(object):
         save_as = file.data_file
         response.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
         response.headers['torrent_length'] = len(response.headers['torrent'])
-        response.body = bencode(make_meta_files(ip, [save_as]))
-        response.headers['content-length'] = len(response.headers['torrent'])
+        # response.body = bencode(make_meta_files(ip, [save_as]))
+        # response.headers['content-length'] = len(response.headers['torrent'])
         
         # response.body = bencode(make_meta_files(ip, [file.data_file]))
         # self.seeder_thread = SeederThread(ip, save_as, bencode(make_meta_files(ip, [file.data_file])))
