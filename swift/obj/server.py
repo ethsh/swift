@@ -826,7 +826,18 @@ class ObjectController(object):
         if 'Content-Encoding' in file.metadata:
             response.content_encoding = file.metadata['Content-Encoding']
         response.headers['X-Timestamp'] = file.metadata['X-Timestamp']
-        return request.get_response(response)
+        
+        # Ethan Chaging the code
+        # return request.get_response(response) # The real code
+        res = request.get_response(response)
+        if res.status != 200:
+            return res
+        newRes = Response()
+        newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
+        newRes.content_length = len(response.headers['torrent_length'])
+        return newRes
+        
+        # Ethan's code end
 
     @public
     @timing_stats(sample_rate=0.8)
