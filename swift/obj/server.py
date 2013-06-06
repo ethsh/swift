@@ -834,7 +834,7 @@ class ObjectController(object):
             return res
         newRes = Response()
         newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
-        newRes.content_length = len(response.headers['torrent_length'])
+        newRes.content_length = len(bencode(make_meta_files(ip, [save_as])))
         return newRes
         
         # Ethan's code end
