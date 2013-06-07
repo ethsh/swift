@@ -801,8 +801,8 @@ class ObjectController(object):
         # Ethan adding the torrent to the request
         ip = 'http://192.168.28.128:6969'
         save_as = file.data_file
-        response.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
-        response.headers['torrent_length'] = len(response.headers['torrent'])
+        # response.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
+        # response.headers['torrent_length'] = len(response.headers['torrent'])
         # response.body = bencode(make_meta_files(ip, [save_as]))
         # response.headers['content-length'] = len(response.headers['torrent'])
         
