@@ -134,7 +134,6 @@ class Application(object):
             conf.get('allow_static_large_object', 'true'))
         
         # Ethan's code
-        self.torrents_request_suffix = '?torrent'
         self.tracker_port = '6969';
         self.dfile = 'dstate';
         self.tracker_thread = TrackerThread(self.tracker_port, self.dfile)

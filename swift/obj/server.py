@@ -54,6 +54,8 @@ reset_stderr()
 from BitTorrent.makemetafile import make_meta_files
 import threading
 from BTL.bencode import bencode, bdecode
+
+TORRENTS_REQUEST_SUFFIX = '?torrent'
 # Ethan's Code end
 
 
@@ -830,13 +832,15 @@ class ObjectController(object):
         # Ethan Chaging the code
         # return request.get_response(response) # The real code
         res = request.get_response(response)
-        if res.status != 200:
-            return res
-        newRes = Response()
-        newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
-        newRes.content_length = len(bencode(make_meta_files(ip, [save_as])))
-        return newRes
         
+        if request.path_qs.endswith(TORRENTS_REQUEST_SUFFIX):
+            if res.status == 200:
+                # good torrent request
+                newRes = Response()
+                newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
+                newRes.content_length = len(bencode(make_meta_files(ip, [save_as])))
+                return newRes
+        return res
         # Ethan's code end
 
     @public
