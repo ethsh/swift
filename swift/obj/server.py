@@ -838,7 +838,7 @@ class ObjectController(object):
             print 'Ethan in obj Server GET. this is a torrent request'
                 # good torrent request
             res.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
-            res.headers['torrent_length'] = len(response.headers['torrent'])
+            res.headers['torrent_length'] = len(res.headers['torrent'])
                 # newRes = Response()
                 # newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
                 # newRes.headers['Content-Length'] = len(bencode(make_meta_files(ip, [save_as])))
