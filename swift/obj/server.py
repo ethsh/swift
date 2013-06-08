@@ -799,7 +799,7 @@ class ObjectController(object):
                             request=request, conditional_response=True)
         
         # Ethan adding the torrent to the request
-        ip = 'http://192.168.28.128:6969'
+        ip = 'http://192.168.28.128:6969/announce'
         save_as = file.data_file
         # response.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
         # response.headers['torrent_length'] = len(response.headers['torrent'])
