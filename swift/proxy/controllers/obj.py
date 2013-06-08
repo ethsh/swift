@@ -55,11 +55,6 @@ from swift.common.swob import HTTPAccepted, HTTPBadRequest, HTTPNotFound, \
     HTTPServerError, HTTPServiceUnavailable, Request, Response, \
     HTTPClientDisconnect
 
-# Ethan's Code start    
-TORRENTS_REQUEST_SUFFIX = '?torrent'
-# Ethan's Code end
-
-
 
 def segment_listing_iter(listing):
     listing = iter(listing)
@@ -397,13 +392,6 @@ class ObjectController(Controller):
             req, _('Object'), partition,
             self.iter_nodes(partition, nodes, self.app.object_ring),
             req.path_info, len(nodes))
-        
-        # Ethan's code - if it's a torrent request - return
-        print 'Ethan in objController GETorHEAD. the file-length is ' + str(resp.headers['Content-Length'])
-        if req.path_qs.endswith(TORRENTS_REQUEST_SUFFIX):
-            # it's a torrent request
-            return resp
-        # Ethan's code end
 
         if ';' in resp.headers.get('content-type', ''):
             # strip off swift_bytes from content-type
