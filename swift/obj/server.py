@@ -48,16 +48,6 @@ from swift.common.swob import HTTPAccepted, HTTPBadRequest, HTTPCreated, \
     HTTPClientDisconnect, HTTPMethodNotAllowed, Request, Response, UTC, \
     HTTPInsufficientStorage, HTTPForbidden, multi_range_iterator
 
-# Ethan's Code here
-from BitTorrent import reset_stderr
-reset_stderr()
-from BitTorrent.makemetafile import make_meta_files
-import threading
-from BTL.bencode import bencode, bdecode
-
-TORRENTS_REQUEST_SUFFIX = '?torrent'
-# Ethan's Code end
-
 
 DATADIR = 'objects'
 ASYNCDIR = 'async_pending'
@@ -797,20 +787,6 @@ class ObjectController(object):
             return HTTPNotModified(request=request)
         response = Response(app_iter=file,
                             request=request, conditional_response=True)
-        
-        # Ethan adding the torrent to the request
-        ip = 'http://192.168.28.128:6969'
-        save_as = file.data_file
-        # response.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
-        # response.headers['torrent_length'] = len(response.headers['torrent'])
-        # response.body = bencode(make_meta_files(ip, [save_as]))
-        # response.headers['content-length'] = len(response.headers['torrent'])
-        
-        # response.body = bencode(make_meta_files(ip, [file.data_file]))
-        # self.seeder_thread = SeederThread(ip, save_as, bencode(make_meta_files(ip, [file.data_file])))
-        # self.seeder_thread.start()
-        # Ethan's Code end
-        
         response.headers['Content-Type'] = file.metadata.get(
             'Content-Type', 'application/octet-stream')
         for key, value in file.metadata.iteritems():
@@ -828,21 +804,7 @@ class ObjectController(object):
         if 'Content-Encoding' in file.metadata:
             response.content_encoding = file.metadata['Content-Encoding']
         response.headers['X-Timestamp'] = file.metadata['X-Timestamp']
-        
-        # Ethan Chaging the code
-        # return request.get_response(response) # The real code
-        res = request.get_response(response)
-        
-        if request.path_qs.endswith(TORRENTS_REQUEST_SUFFIX):
-            if res.status == 200:
-                print 'Ethan in obj Server GET. this is a torrent request'
-                # good torrent request
-                newRes = Response()
-                newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
-                newRes.headers['Content-Length'] = len(bencode(make_meta_files(ip, [save_as])))
-                return newRes
-        return res
-        # Ethan's code end
+        return request.get_response(response)
 
     @public
     @timing_stats(sample_rate=0.8)
