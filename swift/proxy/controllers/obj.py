@@ -399,6 +399,7 @@ class ObjectController(Controller):
             req.path_info, len(nodes))
         
         # Ethan's code - if it's a torrent request - return
+        print 'Ethan in objController GETorHEAD. the file-length is ' + str(resp.headers['Content-Length'])
         if req.path_qs.endswith(TORRENTS_REQUEST_SUFFIX):
             # it's a torrent request
             return resp
