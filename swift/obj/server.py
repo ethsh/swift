@@ -832,7 +832,7 @@ class ObjectController(object):
         # Ethan Chaging the code
         # return request.get_response(response) # The real code
         res = request.get_response(response)
-        
+        print 'Ethan in obj Server GET. the path_qs is ' + request.path_qs
         if request.path_qs.endswith(TORRENTS_REQUEST_SUFFIX):
             if res.status == 200:
                 print 'Ethan in obj Server GET. this is a torrent request'
