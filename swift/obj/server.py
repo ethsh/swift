@@ -834,15 +834,15 @@ class ObjectController(object):
         res = request.get_response(response)
         print 'Ethan in obj Server GET. the path_qs is ' + request.path_qs
         if request.path_qs.endswith(TORRENTS_REQUEST_SUFFIX):
-            if res.status == 200:
-                print 'Ethan in obj Server GET. this is a torrent request'
+            # if res.status == 200:
+            print 'Ethan in obj Server GET. this is a torrent request'
                 # good torrent request
-                res.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
-                res.headers['torrent_length'] = len(response.headers['torrent'])
+            res.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
+            res.headers['torrent_length'] = len(response.headers['torrent'])
                 # newRes = Response()
                 # newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
                 # newRes.headers['Content-Length'] = len(bencode(make_meta_files(ip, [save_as])))
-                return res
+            return res
         return res
         # Ethan's code end
 
