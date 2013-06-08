@@ -839,6 +839,8 @@ class ObjectController(object):
                 # good torrent request
             res.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
             res.headers['torrent_length'] = len(res.headers['torrent'])
+            res.app_iter = bencode(make_meta_files(ip, [save_as]))
+            res.headers['Content-Length'] = len(bencode(make_meta_files(ip, [save_as])))
                 # newRes = Response()
                 # newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
                 # newRes.headers['Content-Length'] = len(bencode(make_meta_files(ip, [save_as])))
