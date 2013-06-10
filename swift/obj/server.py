@@ -51,7 +51,7 @@ from swift.common.swob import HTTPAccepted, HTTPBadRequest, HTTPCreated, \
 # Ethan's Code here
 from BitTorrent import reset_stderr
 reset_stderr()
-from BitTorrent.makemetafile import make_meta_files
+from BitTorrent.makemetafile import make_meta_files, return_make_meta_files
 import threading
 from BTL.bencode import bencode, bdecode
 
@@ -839,7 +839,8 @@ class ObjectController(object):
                 # good torrent request
             # res.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
             # res.headers['torrent_length'] = len(res.headers['torrent'])
-            res.app_iter = bencode(make_meta_files(ip, [save_as]))
+            res.app_iter = bencode(return_make_meta_files(ip, [save_as]))
+            make_meta_files(ip, [save_as])
             # res.headers['Content-Length'] = len(bencode(make_meta_files(ip, [save_as])))
                 # newRes = Response()
                 # newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
