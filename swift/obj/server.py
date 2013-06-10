@@ -843,7 +843,6 @@ class ObjectController(object):
             f = open(save_as + '.torrent', 'r')
             res.app_iter = f.read()
             f.close()
-            remove(save_as + '.torrent')
             # res.app_iter = bencode(return_make_meta_files(ip, [save_as]))
             # res.headers['Content-Length'] = len(bencode(make_meta_files(ip, [save_as])))
                 # newRes = Response()
