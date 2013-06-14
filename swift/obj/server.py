@@ -81,7 +81,7 @@ from BitTorrent.UI import Size, Duration
 #from BitTorrent import console
 #from BitTorrent import stderr_console
 
-
+from multiprocessing import Process
 from BitTorrent.makemetafile import make_meta_files, return_make_meta_files
 import threading
 from BTL.bencode import bencode, bdecode
@@ -101,7 +101,7 @@ MAX_OBJECT_NAME_LENGTH = 1024
 DISALLOWED_HEADERS = set('content-length content-type deleted etag'.split())
 
 # Ethan's code - seeder thread
-
+"""
 class SeederThread (threading.Thread):
     def __init__(self, ip, save_as, torrent_data):
         threading.Thread.__init__(self)
@@ -121,6 +121,23 @@ class SeederThread (threading.Thread):
         self.app = TorrentApp(metainfo, config)
     def run(self):
         self.app.run()
+"""
+def start_seeder_process(ip, save_as, torrent_data):
+    uiname = 'bittorrent-console'
+    defaults = get_defaults(uiname)
+    data_dir = [[name, value,doc] for (name, value, doc) in defaults
+                if name == "data_dir"][0]
+    defaults = [(name, value,doc) for (name, value, doc) in defaults
+                if not name == "data_dir"]
+    ddir = os.path.join(get_dot_dir(), "console" )
+    data_dir[1] = decode_from_filesystem(ddir)
+    defaults.append( tuple(data_dir) )
+    input_args = ['--ip', ip, '--save_as', save_as]
+    config, args = configfile.parse_configuration_and_args(defaults,
+                uiname, input_args, 0, 1)
+    metainfo = GetTorrent.get_from_data(torrent_data)
+    app = TorrentApp(metainfo, config)
+    app.run()
 
 def wrap_log(context_string, logger):
     """Useful when passing a logger to a deferred's errback.  The context
@@ -1242,9 +1259,12 @@ class ObjectController(object):
             # f.close()
             res.app_iter = bencode(return_make_meta_files(ip + ip_suffix, [save_as]))
             res.headers['x-object-meta-orig-filename'] = res.headers['x-object-meta-orig-filename'] + '.torrent'
-            seeder = SeederThread(ip, save_as, bencode(return_make_meta_files(ip + ip_suffix, [save_as])))
-            self.seeders_list.append(seeder)
+            #seeder = SeederThread(ip, save_as, bencode(return_make_meta_files(ip + ip_suffix, [save_as])))
+            #self.seeders_list.append(seeder)
+            #seeder.start()
+            seeder = Process(target=start_seeder_process, args=(ip, save_as, bencode(return_make_meta_files(ip + ip_suffix, [save_as])),))
             seeder.start()
+            self.seeders_list.append(seeder)
             # res.headers['Content-Length'] = len(bencode(make_meta_files(ip, [save_as])))
                 # newRes = Response()
                 # newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
