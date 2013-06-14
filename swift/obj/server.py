@@ -862,6 +862,11 @@ class ObjectController(object):
         self.seeders_list = []
         # Ethan's code end
 
+    # Ethan's code - adding destructor to terminate all seeder processes
+    def __del__(self):
+        for process in self.seeders_list:
+            process.terminate()
+
     def async_update(self, op, account, container, obj, host, partition,
                      contdevice, headers_out, objdevice):
         """
