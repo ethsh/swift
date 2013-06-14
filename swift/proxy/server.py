@@ -141,6 +141,10 @@ class Application(object):
         #track(['--port', self.tracker_port, '--dfile', self.dfile])
         #Ethan's code end
 
+    # Ethans code - added destructor to stop tracker
+    def __del__(self):
+        self.tracker_thread.exit()
+
     def get_controller(self, path):
         """
         Get the controller to handle a request.
