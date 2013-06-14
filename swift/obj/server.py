@@ -1242,9 +1242,9 @@ class ObjectController(object):
             # f.close()
             res.app_iter = bencode(return_make_meta_files(ip + ip_suffix, [save_as]))
             res.headers['x-object-meta-orig-filename'] = res.headers['x-object-meta-orig-filename'] + '.torrent'
-            # seeder = SeederThread(ip, save_as, bencode(return_make_meta_files(ip + ip_suffix, [save_as])))
-            # self.seeders_list.append(seeder)
-            # seeder.start()
+            seeder = SeederThread(ip, save_as, bencode(return_make_meta_files(ip + ip_suffix, [save_as])))
+            self.seeders_list.append(seeder)
+            seeder.start()
             # res.headers['Content-Length'] = len(bencode(make_meta_files(ip, [save_as])))
                 # newRes = Response()
                 # newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
