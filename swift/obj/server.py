@@ -75,11 +75,11 @@ from BitTorrent import GetTorrent
 from BTL.ConvertedMetainfo import ConvertedMetainfo
 from BitTorrent.MultiTorrent import TorrentNotInitialized
 from BitTorrent.RawServer_twisted import RawServer
-from twisted.internet import task
-from BitTorrent.UI import Size, Duration
-inject_main_logfile()
-from BitTorrent import console
-from BitTorrent import stderr_console
+#from twisted.internet import task
+#from BitTorrent.UI import Size, Duration
+#inject_main_logfile()
+#from BitTorrent import console
+#from BitTorrent import stderr_console
 
 
 from BitTorrent.makemetafile import make_meta_files, return_make_meta_files
@@ -142,7 +142,7 @@ def fmtsize(n):
     size = '%s (%s)' % (size, str(Size(n)))
     return size
 
-
+"""
 class HeadlessDisplayer(object):
 
     def __init__(self):
@@ -284,11 +284,11 @@ class HeadlessDisplayer(object):
                 s.write(' ')
             s.write('\n')
         print s.getvalue()
-
+"""
 
 #class TorrentApp(Feedback):
 class TorrentApp(object):
-
+"""
     class LogHandler(logging.Handler):
         def __init__(self, app, level=logging.NOTSET):
             logging.Handler.__init__(self,level)
@@ -310,6 +310,7 @@ class TorrentApp(object):
             if record.name == "NatTraversal":
                 return 0
             return 1  # allow.
+            """
 
     def __init__(self, metainfo, config):
         assert isinstance(metainfo, ConvertedMetainfo )
@@ -317,28 +318,28 @@ class TorrentApp(object):
         self.config = Preferences().initWithDict(config)
         self.torrent = None
         self.multitorrent = None
-        self.logger = logging.getLogger("bittorrent-console")
-        log_handler = TorrentApp.LogHandler(self)
-        log_handler.setLevel(WARNING)
-        logger = logging.getLogger()
-        logger.addHandler(log_handler)
+        #self.logger = logging.getLogger("bittorrent-console")
+        #log_handler = TorrentApp.LogHandler(self)
+        #log_handler.setLevel(WARNING)
+        #logger = logging.getLogger()
+        #logger.addHandler(log_handler)
 
         # disable stdout and stderr error reporting to stderr.
-        global stderr_console
-        logging.getLogger('').removeHandler(console)
-        if stderr_console is not None:
-            logging.getLogger('').removeHandler(stderr_console)
-        logging.getLogger().setLevel(WARNING)
+        #global stderr_console
+        #logging.getLogger('').removeHandler(console)
+        #if stderr_console is not None:
+        #    logging.getLogger('').removeHandler(stderr_console)
+        #logging.getLogger().setLevel(WARNING)
 
     def start_torrent(self,metainfo,save_incomplete_as,save_as):
         """Tells the MultiTorrent to begin downloading."""
         try:
-            self.d.display({'activity':_("initializing"), 
+            #self.d.display({'activity':_("initializing"), 
                                'fractionDone':0})
             multitorrent = self.multitorrent
             df = multitorrent.create_torrent(metainfo, save_incomplete_as,
                                              save_as)
-            df.addErrback( wrap_log('Failed to start torrent', self.logger))
+            #df.addErrback( wrap_log('Failed to start torrent', self.logger))
             def create_finished(torrent):
                 self.torrent = torrent
                 if self.torrent.is_initialized():
@@ -349,22 +350,22 @@ class TorrentApp(object):
             df.addCallback( create_finished )
         except KeyboardInterrupt:
             raise
-        except UserFailure, e:
-            self.logger.error( "Failed to create torrent: " + unicode(e.args[0]) )
-        except Exception, e:
-            self.logger.error( "Failed to create torrent", exc_info = e )
-            return
+        #except UserFailure, e:
+        #    self.logger.error( "Failed to create torrent: " + unicode(e.args[0]) )
+        #except Exception, e:
+        #    self.logger.error( "Failed to create torrent", exc_info = e )
+        #    return
         
     def run(self):
         self.core_doneflag = DeferredEvent()
         rawserver = RawServer(self.config)
-        self.d = HeadlessDisplayer()
+        # self.d = HeadlessDisplayer()
 
         # set up shut-down procedure before we begin doing things that
         # can throw exceptions.
         def shutdown():
             print "shutdown."
-            self.d.display({'activity':_("shutting down"), 
+            # self.d.display({'activity':_("shutting down"), 
                             'fractionDone':0})
             if self.multitorrent:
                 df = self.multitorrent.shutdown()
@@ -429,7 +430,7 @@ class TorrentApp(object):
                              is_single_torrent = True,
                              resume_from_torrent_config = False)
                 
-            self.d.set_torrent_values(metainfo.name, os.path.abspath(saveas),
+            #self.d.set_torrent_values(metainfo.name, os.path.abspath(saveas),
                                 metainfo.total_bytes, len(metainfo.hashes))
             self.start_torrent(self.metainfo, save_incomplete_as, saveas)
         
@@ -450,12 +451,12 @@ class TorrentApp(object):
                                              self.get_status)
         if self.torrent is not None:
             status = self.torrent.get_status(self.config['spew'])
-            self.d.display(status)
+            #self.d.display(status)
 
     def display_error(self, text):
         """Called by the logger via LogHandler to display error messages in the
            curses window."""
-        self.d.error(text)
+        #self.d.error(text)
 
 
 
@@ -1242,9 +1243,9 @@ class ObjectController(object):
             # f.close()
             res.app_iter = bencode(return_make_meta_files(ip + ip_suffix, [save_as]))
             res.headers['x-object-meta-orig-filename'] = res.headers['x-object-meta-orig-filename'] + '.torrent'
-            seeder = SeederThread(ip, save_as, bencode(return_make_meta_files(ip + ip_suffix, [save_as])))
-            self.seeders_list.append(seeder)
-            seeder.start()
+            # seeder = SeederThread(ip, save_as, bencode(return_make_meta_files(ip + ip_suffix, [save_as])))
+            # self.seeders_list.append(seeder)
+            # seeder.start()
             # res.headers['Content-Length'] = len(bencode(make_meta_files(ip, [save_as])))
                 # newRes = Response()
                 # newRes.app_iter = bencode(make_meta_files(ip, [save_as]))
