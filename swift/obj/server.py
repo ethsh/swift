@@ -14,8 +14,8 @@
 # limitations under the License.
 
 """ Object Server for Swift """
-
-from __future__ import with_statement
+# Ethan added in the next row the import of division
+from __future__ import with_statement, division
 import cPickle as pickle
 import errno
 import os
@@ -56,7 +56,6 @@ import threading
 from BTL.bencode import bencode, bdecode
 
 # imports for seeder
-from __future__ import division
 
 from BitTorrent.translation import _
 import sys
