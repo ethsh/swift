@@ -137,7 +137,7 @@ def start_seeder_process(ip, save_as, torrent_data):
                 uiname, input_args, 0, 1)
     metainfo = GetTorrent.get_from_data(torrent_data)
     app = TorrentApp(metainfo, config)
-    app.run()
+    app.run(config)
 
 def wrap_log(context_string, logger):
     """Useful when passing a logger to a deferred's errback.  The context
@@ -371,8 +371,9 @@ class TorrentApp(object):
         #except Exception, e:
         #    self.logger.error( "Failed to create torrent", exc_info = e )
         #    return
-        
-    def run(self):
+    
+    # Ethan added config to the arguments...
+    def run(self, config):
         self.core_doneflag = DeferredEvent()
         rawserver = RawServer(self.config)
         # self.d = HeadlessDisplayer()
