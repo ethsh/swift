@@ -365,7 +365,7 @@ class TorrentApp(object):
         def shutdown():
             print "shutdown."
             # self.d.display({'activity':_("shutting down"), 
-                            'fractionDone':0})
+            #                'fractionDone':0})
             if self.multitorrent:
                 df = self.multitorrent.shutdown()
                 stop_rawserver = lambda *a : rawserver.stop()
@@ -430,7 +430,7 @@ class TorrentApp(object):
                              resume_from_torrent_config = False)
                 
             #self.d.set_torrent_values(metainfo.name, os.path.abspath(saveas),
-                                metainfo.total_bytes, len(metainfo.hashes))
+            #                    metainfo.total_bytes, len(metainfo.hashes))
             self.start_torrent(self.metainfo, save_incomplete_as, saveas)
         
             self.get_status()
