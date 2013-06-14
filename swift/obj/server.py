@@ -51,22 +51,22 @@ from swift.common.swob import HTTPAccepted, HTTPBadRequest, HTTPCreated, \
 # Ethan's Code here
 
 # imports for seeder
-from BitTorrent.translation import _
-import sys
-import os
-from cStringIO import StringIO
-import logging
-from logging import ERROR, WARNING
-from time import strftime, sleep
-import traceback
-import BTL.stackthreading as threading
+#from BitTorrent.translation import _
+#import sys
+#import os
+#from cStringIO import StringIO
+#import logging
+#from logging import ERROR, WARNING
+#from time import strftime, sleep
+#import traceback
+#import BTL.stackthreading as threading
 from BTL.platform import decode_from_filesystem, encode_for_filesystem
 from BitTorrent.platform import get_dot_dir
 from BTL.defer import DeferredEvent
-from BitTorrent import inject_main_logfile
+#from BitTorrent import inject_main_logfile
 from BitTorrent.MultiTorrent import Feedback, MultiTorrent
 from BitTorrent.defaultargs import get_defaults
-from BitTorrent.parseargs import printHelp
+#from BitTorrent.parseargs import printHelp
 from BitTorrent.prefs import Preferences
 from BitTorrent import configfile
 from BitTorrent import BTFailure, UserFailure
@@ -76,7 +76,7 @@ from BTL.ConvertedMetainfo import ConvertedMetainfo
 from BitTorrent.MultiTorrent import TorrentNotInitialized
 from BitTorrent.RawServer_twisted import RawServer
 #from twisted.internet import task
-#from BitTorrent.UI import Size, Duration
+from BitTorrent.UI import Size, Duration
 #inject_main_logfile()
 #from BitTorrent import console
 #from BitTorrent import stderr_console
