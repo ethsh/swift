@@ -49,14 +49,8 @@ from swift.common.swob import HTTPAccepted, HTTPBadRequest, HTTPCreated, \
     HTTPInsufficientStorage, HTTPForbidden, multi_range_iterator
 
 # Ethan's Code here
-from BitTorrent import reset_stderr
-reset_stderr()
-from BitTorrent.makemetafile import make_meta_files, return_make_meta_files
-import threading
-from BTL.bencode import bencode, bdecode
 
 # imports for seeder
-
 from BitTorrent.translation import _
 import sys
 import os
@@ -86,6 +80,13 @@ from BitTorrent.UI import Size, Duration
 inject_main_logfile()
 from BitTorrent import console
 from BitTorrent import stderr_console
+
+
+from BitTorrent.makemetafile import make_meta_files, return_make_meta_files
+import threading
+from BTL.bencode import bencode, bdecode
+from BitTorrent import reset_stderr
+reset_stderr()
 
 TORRENTS_REQUEST_SUFFIX = '?torrent'
 # Ethan's Code end
