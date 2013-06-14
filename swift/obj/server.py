@@ -334,7 +334,7 @@ class TorrentApp(object):
         """Tells the MultiTorrent to begin downloading."""
         try:
             #self.d.display({'activity':_("initializing"), 
-                               'fractionDone':0})
+            #                   'fractionDone':0})
             multitorrent = self.multitorrent
             df = multitorrent.create_torrent(metainfo, save_incomplete_as,
                                              save_as)
