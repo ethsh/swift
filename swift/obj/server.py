@@ -288,7 +288,7 @@ class HeadlessDisplayer(object):
 
 #class TorrentApp(Feedback):
 class TorrentApp(object):
-"""
+    """
     class LogHandler(logging.Handler):
         def __init__(self, app, level=logging.NOTSET):
             logging.Handler.__init__(self,level)
@@ -310,8 +310,7 @@ class TorrentApp(object):
             if record.name == "NatTraversal":
                 return 0
             return 1  # allow.
-            """
-
+    """
     def __init__(self, metainfo, config):
         assert isinstance(metainfo, ConvertedMetainfo )
         self.metainfo = metainfo
