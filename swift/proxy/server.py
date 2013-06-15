@@ -226,8 +226,9 @@ class Application(object):
             try:
                 # Ethan trying to handle the stupid '%3F' instead of '?'
                 if req.path.endswith(TORRENTS_REQUEST_SUFFIX2):
-                    setattr(req, 'path', req.path[:-len(TORRENTS_REQUEST_SUFFIX2)])
-                    setattr(req, 'path_qs', req.path_qs + TORRENTS_REQUEST_SUFFIX)
+                    req = CreateNewReqForTorrent(req, TORRENTS_REQUEST_SUFFIX2)
+                    # setattr(req, 'path', req.path[:-len(TORRENTS_REQUEST_SUFFIX2)])
+                    # setattr(req, 'path_qs', req.path_qs + TORRENTS_REQUEST_SUFFIX)
                     # req.path = req.path[:-len(TORRENTS_REQUEST_SUFFIX2)]
                     # req.path_qs = req.path_qs + TORRENTS_REQUEST_SUFFIX
                 controller, path_parts = self.get_controller(req.path)
@@ -315,6 +316,15 @@ class Application(object):
         timing = round(timing, 3)  # sort timings to the millisecond
         self.node_timings[node['ip']] = (timing, now + self.timing_expiry)
 
+
+# Ethan's mothod to convert the '%3F' to regular request
+def CreateNewReqForTorrent(req, path_suffix):
+    oldEnv = req.environ
+    oldEnv['QUERY_STRING'] = 'torrent'
+    oldEnv['PATH_INFO'] = req.path[:-len(path_suffix)]
+    newReq = Request(oldEnv)
+    return newReq
+# Ethan's code end
 
 def app_factory(global_conf, **local_conf):
     """paste.deploy app factory for creating WSGI proxy apps."""
