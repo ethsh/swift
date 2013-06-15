@@ -1256,6 +1256,7 @@ class ObjectController(object):
         if request.path_qs.endswith(TORRENTS_REQUEST_SUFFIX):
             # if res.status == 200:
             print 'Ethan in obj Server GET. this is a torrent request'
+            file_in_name= res.headers['x-object-meta-orig-filename']
                 # good torrent request
             # res.headers['torrent'] = bencode(make_meta_files(ip, [save_as]))
             # res.headers['torrent_length'] = len(res.headers['torrent'])
@@ -1263,12 +1264,12 @@ class ObjectController(object):
             # f = open(save_as + '.torrent', 'r')
             # res.app_iter = f.read()
             # f.close()
-            res.app_iter = bencode(return_make_meta_files(ip + ip_suffix, [save_as]))
+            res.app_iter = bencode(return_make_meta_files(ip + ip_suffix, [save_as], file_in_name = file_in_name))
             res.headers['x-object-meta-orig-filename'] = res.headers['x-object-meta-orig-filename'] + '.torrent'
             #seeder = SeederThread(ip, save_as, bencode(return_make_meta_files(ip + ip_suffix, [save_as])))
             #self.seeders_list.append(seeder)
             #seeder.start()
-            seeder = Process(target=start_seeder_process, args=(ip, save_as, bencode(return_make_meta_files(ip + ip_suffix, [save_as])),))
+            seeder = Process(target=start_seeder_process, args=(ip, save_as, bencode(return_make_meta_files(ip + ip_suffix, [save_as],file_in_name = file_in_name)),))
             seeder.start()
             self.seeders_list.append(seeder)
             # res.headers['Content-Length'] = len(bencode(make_meta_files(ip, [save_as])))
