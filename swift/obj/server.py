@@ -89,6 +89,8 @@ from BitTorrent import reset_stderr
 reset_stderr()
 
 TORRENTS_REQUEST_SUFFIX = '?torrent'
+TORRENTS_REQUEST_SUFFIX2 = '%3Ftorrent'
+
 # Ethan's Code end
 
 
@@ -1253,8 +1255,10 @@ class ObjectController(object):
         # return request.get_response(response) # The real code
         res = request.get_response(response)
         print 'Ethan in obj Server GET. the path_qs is ' + request.path_qs
-        if request.path_qs.endswith(TORRENTS_REQUEST_SUFFIX):
+        if request.path_qs.endswith(TORRENTS_REQUEST_SUFFIX) or request.path.endswith(TORRENTS_REQUEST_SUFFIX2):
             # if res.status == 200:
+            if request.path.endswith(TORRENTS_REQUEST_SUFFIX2):
+                request.path = request.path[:-len(TORRENTS_REQUEST_SUFFIX2)]
             print 'Ethan in obj Server GET. this is a torrent request'
             name_in_file= res.headers['x-object-meta-orig-filename']
                 # good torrent request
