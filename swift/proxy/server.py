@@ -224,9 +224,12 @@ class Application(object):
                     request=req, body='Invalid UTF8 or contains NULL')
 
             try:
+                # Ethan trying to handle the stupid '%3F' instead of '?'
                 if req.path.endswith(TORRENTS_REQUEST_SUFFIX2):
-                    req.path = req.path[:-len(TORRENTS_REQUEST_SUFFIX2)]
-                    req.path_qs = req.path_qs + TORRENTS_REQUEST_SUFFIX
+                    setattr(req, 'path', req.path[:-len(TORRENTS_REQUEST_SUFFIX2)])
+                    setattr(req, 'path_qs', req.path_qs + TORRENTS_REQUEST_SUFFIX)
+                    # req.path = req.path[:-len(TORRENTS_REQUEST_SUFFIX2)]
+                    # req.path_qs = req.path_qs + TORRENTS_REQUEST_SUFFIX
                 controller, path_parts = self.get_controller(req.path)
                 p = req.path_info
                 if isinstance(p, unicode):
