@@ -50,6 +50,9 @@ from BitTorrent import reset_stderr
 reset_stderr()
 from BitTorrent.track import track
 
+TORRENTS_REQUEST_SUFFIX = '?torrent'
+TORRENTS_REQUEST_SUFFIX2 = '%3Ftorrent'
+
 class TrackerThread (threading.Thread):
     def __init__(self, port, dstate):
         threading.Thread.__init__(self)
@@ -221,6 +224,9 @@ class Application(object):
                     request=req, body='Invalid UTF8 or contains NULL')
 
             try:
+                if req.path.endswith(TORRENTS_REQUEST_SUFFIX2):
+                    req.path = req.path[:-len(TORRENTS_REQUEST_SUFFIX2)]
+                    req.path_qs = req.path_qs + TORRENTS_REQUEST_SUFFIX
                 controller, path_parts = self.get_controller(req.path)
                 p = req.path_info
                 if isinstance(p, unicode):
